@@ -1,5 +1,3 @@
-// vars/applyK8sConfigs.groovy
-
 def call(Map params) {
     assert params.containsKey('repoUrl') : "Missing required parameter: repoUrl"
     assert params.containsKey('credentialsId') : "Missing required parameter: credentialsId"
@@ -7,28 +5,19 @@ def call(Map params) {
     assert params.containsKey('environment') : "Missing required parameter: environment"
     assert params.containsKey('awsCredentialsId') : "Missing required parameter: awsCredentialsId"
 
-    String repoUrl = params.repoUrl
-    String credentialsId = params.credentialsId
-    String namespace = params.namespace
-    String environment = params.environment
-    String awsCredentialsId = params.awsCredentialsId
+    // Checkout the config repo
+    checkout([
+        $class: 'GitSCM',
+        branches: [[name: params.branch ?: 'main']],
+        userRemoteConfigs: [[
+            url: params.repoUrl,
+            credentialsId: params.credentialsId
+        ]]
+    ])
 
-    // Use checkoutCode() function for consistency
-    stage("Checkout Config Repo for ${environment}") {
-        checkoutCode(
-            branch: 'main', // or params.branch if dynamic branching is required
-            credentialsId: credentialsId,
-            url: repoUrl
-        )
-    }
-
-    stage("Apply ConfigMap and Secret for ${environment}") {
-        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: awsCredentialsId]]) {
-            // Applying ConfigMap
-            sh "kubectl apply -f ${environment}/configmaps/ -n ${namespace} --validate=false"
-            
-            // Applying Secrets
-            sh "kubectl apply -f ${environment}/secrets/ -n ${namespace} --validate=false"
-        }
+    // Apply ConfigMap and Secret
+    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: params.awsCredentialsId]]) {
+        sh "kubectl apply -f ${params.environment}/configmaps/ -n ${params.namespace} --validate=false"
+        sh "kubectl apply -f ${params.environment}/secrets/ -n ${params.namespace} --validate=false"
     }
 }
