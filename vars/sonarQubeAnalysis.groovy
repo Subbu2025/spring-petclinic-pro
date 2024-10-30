@@ -16,6 +16,9 @@ def call(Map params = [:]) {
             // Retrieve SonarQube token from the Secret
             sonarToken = sh(script: "kubectl get secret sonar-secrets -n ${namespace} -o=jsonpath='{.data.SONAR_TOKEN}' | base64 --decode", returnStdout: true).trim()
 
+            // Debugging step: List contents of the workspace
+            sh "ls -la"
+
             // Run SonarQube analysis
             withEnv(["SONAR_HOST_URL=${sonarUrl}", "SONAR_PROJECT_KEY=${sonarProjectKey}", "SONAR_TOKEN=${sonarToken}"]) {
                 sh "./mvnw sonar:sonar -Dsonar.host.url=${SONAR_HOST_URL} -Dsonar.projectKey=${SONAR_PROJECT_KEY} -Dsonar.login=${SONAR_TOKEN}"
