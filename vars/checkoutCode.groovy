@@ -1,4 +1,8 @@
-def call(String branch = 'main', String credentialsId = 'Subbu2025_github-creds') {
+// checkoutCode.groovy
+def call(Map params) {
+    String branch = params.get('branch', 'main')
+    String credentialsId = params.get('credentialsId', 'Subbu2025_github-creds')
+
     stage('Checkout Code') {
         checkout([
             $class: 'GitSCM',
