@@ -1,34 +1,32 @@
-// vars/applyK8sConfigs.groovy
-
 def call(Map params) {
+    // Parameter assertions for validation
     assert params.containsKey('repoUrl') : "Missing required parameter: repoUrl"
     assert params.containsKey('credentialsId') : "Missing required parameter: credentialsId"
     assert params.containsKey('namespace') : "Missing required parameter: namespace"
     assert params.containsKey('environment') : "Missing required parameter: environment"
     assert params.containsKey('awsCredentialsId') : "Missing required parameter: awsCredentialsId"
 
+    // Explicitly declare variables for each parameter for clarity
     String repoUrl = params.repoUrl
     String credentialsId = params.credentialsId
     String namespace = params.namespace
     String environment = params.environment
     String awsCredentialsId = params.awsCredentialsId
+    String branch = params.get('branch', 'main')  // Default to 'main' if branch is not provided
 
-    // Use checkoutCode() function for consistency
-    stage("Checkout Config Repo for ${environment}") {
-        checkoutCode(
-            branch: 'main', // or params.branch if dynamic branching is required
-            credentialsId: credentialsId,
-            url: repoUrl
-        )
-    }
+    // Checkout the config repo
+    checkout([
+        $class: 'GitSCM',
+        branches: [[name: branch]],
+        userRemoteConfigs: [[
+            url: repoUrl,
+            credentialsId: credentialsId
+        ]]
+    ])
 
-    stage("Apply ConfigMap and Secret for ${environment}") {
-        withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: awsCredentialsId]]) {
-            // Applying ConfigMap
-            sh "kubectl apply -f ${environment}/configmaps/ -n ${namespace} --validate=false"
-            
-            // Applying Secrets
-            sh "kubectl apply -f ${environment}/secrets/ -n ${namespace} --validate=false"
-        }
+    // Apply ConfigMap and Secret
+    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: awsCredentialsId]]) {
+        sh "kubectl apply -f ${environment}/configmaps/ -n ${namespace} --validate=false"
+        sh "kubectl apply -f ${environment}/secrets/ -n ${namespace} --validate=false"
     }
 }
