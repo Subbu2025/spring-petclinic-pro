@@ -1,22 +1,21 @@
 def call(Map params = [:]) {
+    // Validate required parameters
     assert params.containsKey('credentialsId') : "Missing required parameter: credentialsId"
     assert params.containsKey('url') : "Missing required parameter: url"
-
+    
+    // Get parameters
     String branch = params.get('branch', 'main')
     String credentialsId = params.credentialsId
-    String repoUrl = params.url
-    String stageName = params.get('stageName', 'Checkout Code') // Allow custom stage names
+    String repo_url = params.url
 
-    stage(stageName) {
-        echo "Checking out branch '${branch}' from '${repoUrl}'"
-        
-        checkout([
-            $class: 'GitSCM',
-            branches: [[name: branch]],
-            userRemoteConfigs: [[
-                url: repoUrl,
-                credentialsId: credentialsId
-            ]]
-        ])
-    }
+    echo "Checking out branch '${branch}' from '${repo_url}'"
+    
+    checkout([
+        $class: 'GitSCM',
+        branches: [[name: branch]],
+        userRemoteConfigs: [[
+            url: repo_url,
+            credentialsId: credentialsId
+        ]]
+    ])
 }
