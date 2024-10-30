@@ -13,8 +13,13 @@ def call(Map params) {
     String environment = params.environment
     String awsCredentialsId = params.awsCredentialsId
 
+    // Use checkoutCode() function for consistency
     stage("Checkout Config Repo for ${environment}") {
-        git url: repoUrl, credentialsId: credentialsId
+        checkoutCode(
+            branch: 'main', // or params.branch if dynamic branching is required
+            credentialsId: credentialsId,
+            url: repoUrl
+        )
     }
 
     stage("Apply ConfigMap and Secret for ${environment}") {
