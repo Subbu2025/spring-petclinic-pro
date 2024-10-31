@@ -6,7 +6,10 @@ def call(Map params) {
     assert params.containsKey('awsCredentialsId') : "Missing required parameter: awsCredentialsId"
     assert params.containsKey('dockerImageName') : "Missing required parameter: dockerImageName"
     assert params.containsKey('prId') : "Missing required parameter: prId"
-
+    
+    // Optional parameter with a default value for region
+    String awsRegion = params.get('awsRegion', 'us-east-1')
+    
     String repoUrl = params.repoUrl
     String awsCredentialsId = params.awsCredentialsId
     String dockerImageName = params.dockerImageName
@@ -15,19 +18,24 @@ def call(Map params) {
     String fullImageTag = "${dockerImageName}:${prId}-${buildNumber}"
 
     stage("Build Docker Image") {
+        echo "Building Docker image with tag ${fullImageTag}"
         sh "docker build -t ${fullImageTag} ."
     }
 
     stage("Tag and Push Docker Image to ECR") {
         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: awsCredentialsId]]) {
-            // Retrieve the ECR login password and log into ECR
-            sh "aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin ${repoUrl}"
-
-            // Tag the image for ECR
+            echo "Logging into AWS ECR and pushing image to ${repoUrl}"
+            
+            // ECR login
+            sh "aws ecr get-login-password --region ${awsRegion} | docker login --username AWS --password-stdin ${repoUrl}"
+            
+            // Tagging the image for ECR
             sh "docker tag ${fullImageTag} ${repoUrl}/${fullImageTag}"
-
-            // Push to ECR
+            
+            // Pushing the image
             sh "docker push ${repoUrl}/${fullImageTag}"
         }
     }
+    
+    echo "Docker image ${repoUrl}/${fullImageTag} pushed successfully."
 }
