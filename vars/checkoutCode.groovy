@@ -8,11 +8,13 @@ def call(Map params) {
     checkout([
         $class: 'GitSCM',
         branches: [[name: "*/${branch}"]],
-        doGenerateSubmoduleConfigurations: false,
-        extensions: [[$class: 'CloneOption', noTags: false, shallow: false, depth: 0, timeout: 10]],
         userRemoteConfigs: [[
             url: params.url,
             credentialsId: params.credentialsId
         ]]
     ])
+    
+    // Retrieve the commit SHA after checkout
+    env.shortCommitSha = sh(script: "git rev-parse --short HEAD", returnStdout: true).trim()
+    echo "Retrieved Commit SHA: ${env.shortCommitSha}"
 }
