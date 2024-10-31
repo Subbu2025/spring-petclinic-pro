@@ -21,12 +21,10 @@ def call(Map params) {
     String ecrImageTag = "${repoUrl}:${imageTag}"
 
     // Build Docker Image
-    stage("Build Docker Image") {
         sh "docker build -t ${ecrImageTag} ."
-    }
+    
 
     // Push Docker Image to ECR
-    stage("Push Docker Image to ECR") {
         withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: awsCredentialsId]]) {
             // Log in to ECR using the specified region
             sh "aws ecr get-login-password --region ${awsRegion} | docker login --username AWS --password-stdin ${repoUrl}"
@@ -34,7 +32,7 @@ def call(Map params) {
             // Push the image to ECR
             sh "docker push ${ecrImageTag}"
         }
-    }
+    
 
     echo "Successfully built and pushed Docker image: ${ecrImageTag}"
 }
