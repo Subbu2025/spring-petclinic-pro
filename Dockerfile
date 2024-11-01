@@ -1,36 +1,11 @@
-# Step 1: Build Stage with Maven and JDK 17
-FROM maven:3.9.4-eclipse-temurin-17-alpine AS build
+dockerfileCopy code# Initial Dockerfile: Build and Run in One Step (Non-Optimized)
+FROM maven:3.9.4-eclipse-temurin-17-alpine
 
 WORKDIR /app
 
-# Copy the pom.xml and download only necessary dependencies to reduce image size
-COPY pom.xml ./
-RUN mvn dependency:go-offline -B
-
-# Copy the rest of the source code and package the application
-COPY src ./src
+# Copy source code and build the application
+COPY . .
 RUN mvn clean package -DskipTests
 
-# Step 2: Runtime Stage with a Smaller Base Image
-FROM eclipse-temurin:17-jdk-alpine as jlink
-
-# Use jlink to create a minimal Java runtime
-RUN $JAVA_HOME/bin/jlink \
-      --add-modules java.base,java.logging,java.sql,java.xml \
-      --output /javaruntime \
-      --strip-debug --no-man-pages --no-header-files --compress=2
-
-# Step 3: Final Runtime Stage with Minimal Java Runtime
-FROM alpine:3.17
-
-WORKDIR /app
-
-# Copy minimal Java runtime and built JAR from previous stages
-COPY --from=jlink /javaruntime /javaruntime
-COPY --from=build /app/target/spring-petclinic-*.jar /app/app.jar
-
-# Set the PATH to include minimal Java runtime
-ENV PATH="/javaruntime/bin:$PATH"
-
 # Run the application
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+ENTRYPOINT ["java", "-jar", "target/spring-petclinic-*.jar"]
