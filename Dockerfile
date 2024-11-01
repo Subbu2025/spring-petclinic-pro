@@ -1,25 +1,25 @@
-# Use a Maven image with JDK 17 for the build stage
-FROM maven:3.9.4-eclipse-temurin-17-alpine AS build
-
+# Stage 1: Build Stage
+FROM maven:3.8.5-openjdk-17 AS build
 WORKDIR /app
-
-# Copy the pom.xml first and download the dependencies
-COPY pom.xml ./
-RUN mvn dependency:go-offline -B
-
-# Copy the source code after dependencies are cached
+COPY pom.xml .
+RUN mvn dependency:go-offline
 COPY src ./src
+RUN mvn clean package -DskipTests
 
-# Package the application
-RUN mvn clean package -DskipTests -Ddockerfile.skip=true
+# Stage 2: Create minimal Java runtime with JLink
+FROM eclipse-temurin:17-jdk-alpine AS jlink
+RUN $JAVA_HOME/bin/jlink \
+    --module-path $JAVA_HOME/jmods \
+    --add-modules java.base,java.logging,java.xml,java.naming,java.sql,java.management,java.instrument,jdk.unsupported,java.desktop,java.security.jgss \
+    --output /javaruntime \
+    --compress=2 --no-header-files --no-man-pages
 
-# Use JDK 17 for the runtime stage
-FROM eclipse-temurin:17-jdk-alpine AS runtime
-
+# Stage 3: Final Stage
+FROM alpine:3.17
 WORKDIR /app
+COPY --from=jlink /javaruntime /opt/java-minimal
+ENV PATH="/opt/java-minimal/bin:$PATH"
+COPY --from=build /app/target/*.jar /app/app.jar
 
-# Copy the built JAR from the build stage
-COPY --from=build /app/target/spring-petclinic-*.jar /app/app.jar
-
-# Define the entry point
+EXPOSE 8081
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
