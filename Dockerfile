@@ -16,7 +16,7 @@ FROM eclipse-temurin:17-jdk-alpine AS jlink
 
 # Use jlink to create a minimal Java runtime, including only the required modules
 RUN $JAVA_HOME/bin/jlink \
-    --add-modules java.base,java.logging,java.sql,java.naming,java.management,java.xml \
+    --add-modules java.base,java.logging,java.sql,java.naming,java.management,java.xml,java.desktop \
     --output /javaruntime \
     --strip-debug --no-man-pages --no-header-files --compress=2
 
