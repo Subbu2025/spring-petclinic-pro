@@ -14,9 +14,9 @@ RUN mvn clean package -DskipTests
 # Step 2: Runtime Optimization with JLink
 FROM eclipse-temurin:17-jdk-alpine AS jlink
 
-# Use jlink to create a minimal Java runtime, including java.desktop for PropertyEditorSupport
+# Use jlink to create a minimal Java runtime, including java.naming for NamingException
 RUN $JAVA_HOME/bin/jlink \
-    --add-modules java.base,java.logging,java.sql,java.xml,java.desktop \
+    --add-modules java.base,java.logging,java.sql,java.xml,java.naming,java.desktop \
     --output /javaruntime \
     --strip-debug --no-man-pages --no-header-files --compress=2
 
