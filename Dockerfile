@@ -1,25 +1,27 @@
-# Use a Maven image with JDK 17 for the build stage
+# Step 1: Build stage
 FROM maven:3.9.4-eclipse-temurin-17-alpine AS build
 
 WORKDIR /app
 
-# Copy the pom.xml first and download the dependencies
+# Copy the pom.xml and download dependencies (cached if dependencies don't change)
 COPY pom.xml ./
 RUN mvn dependency:go-offline -B
 
-# Copy the source code after dependencies are cached
+# Copy the source code and build the application
 COPY src ./src
+RUN mvn clean package -DskipTests -Ddockerfile.skip=true \
+    && rm -rf /root/.m2/repository  
 
-# Package the application
-RUN mvn clean package -DskipTests -Ddockerfile.skip=true
-
-# Use JDK 17 for the runtime stage
-FROM eclipse-temurin:17-jdk-alpine AS runtime
+# Step 2: Runtime stage
+FROM eclipse-temurin:17-jdk-alpine
 
 WORKDIR /app
 
-# Copy the built JAR from the build stage
+# Copy the Spring Boot JAR file from the build stage
 COPY --from=build /app/target/spring-petclinic-*.jar /app/app.jar
 
-# Define the entry point
+# Expose the application port
+EXPOSE 8080
+
+# Run the application
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]
