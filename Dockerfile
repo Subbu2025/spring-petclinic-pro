@@ -10,7 +10,7 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:17-jdk-alpine AS jlink
 RUN $JAVA_HOME/bin/jlink \
     --module-path $JAVA_HOME/jmods \
-    --add-modules java.base,java.logging,java.xml,java.naming,java.sql,java.desktop,java.security.jgss,java.management \
+    --add-modules java.base,java.logging,java.xml,java.naming,java.sql,java.desktop,java.security.jgss,java.management,java.instrument \
     --output /javaruntime \
     --compress=2 --no-header-files --no-man-pages
 
