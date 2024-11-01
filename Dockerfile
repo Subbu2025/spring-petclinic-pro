@@ -1,18 +1,20 @@
-# Step 1: Build stage - using a smaller JDK base image for Maven build
-FROM maven:3.9.4-eclipse-temurin-17-jre-alpine AS build
+# Step 1: Build stage - using a Maven image with JDK 17 for Alpine
+FROM maven:3.9.4-eclipse-temurin-17-alpine AS build
 
 WORKDIR /app
 
-# Copy only the pom.xml and download dependencies to cache them in a separate layer
+# Copy the pom.xml and download dependencies separately to leverage Docker caching
 COPY pom.xml ./
 RUN mvn dependency:go-offline -B
 
-# Copy the rest of the project files and build the application
+# Copy the source code after dependencies are cached
 COPY src ./src
+
+# Package the application
 RUN mvn clean package -DskipTests -Ddockerfile.skip=true \
     && rm -rf /root/.m2/repository  # Remove Maven cache after building
 
-# Step 2: Runtime stage - using a slimmer JRE-only base image
+# Step 2: Runtime stage - using a slim JRE-only base image for runtime
 FROM openjdk:17-jdk-slim
 
 WORKDIR /app
