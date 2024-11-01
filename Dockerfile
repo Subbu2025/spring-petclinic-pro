@@ -1,4 +1,4 @@
-dockerfileCopy code# Initial Dockerfile: Build and Run in One Step (Non-Optimized)
+# Initial Dockerfile: Build and Run in One Step (Non-Optimized)
 FROM maven:3.9.4-eclipse-temurin-17-alpine
 
 WORKDIR /app
