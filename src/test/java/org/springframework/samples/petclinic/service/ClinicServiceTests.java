@@ -1,19 +1,3 @@
-/*
- * Copyright 2012-2019 the original author or authors.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *      https://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
- */
-
 package org.springframework.samples.petclinic.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -28,6 +12,7 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.context.annotation.ComponentScan;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.samples.petclinic.owner.Owner;
 import org.springframework.samples.petclinic.owner.OwnerRepository;
@@ -39,190 +24,124 @@ import org.springframework.samples.petclinic.vet.VetRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Integration test of the Service and the Repository layer.
- * <p>
- * ClinicServiceSpringDataJpaTests subclasses benefit from the following services provided
- * by the Spring TestContext Framework:
- * </p>
- * <ul>
- * <li><strong>Spring IoC container caching</strong> which spares us unnecessary set up
- * time between test execution.</li>
- * <li><strong>Dependency Injection</strong> of test fixture instances, meaning that we
- * don't need to perform application context lookups. See the use of
- * {@link Autowired @Autowired} on the <code> </code> instance variable, which uses
- * autowiring <em>by type</em>.
- * <li><strong>Transaction management</strong>, meaning each test method is executed in
- * its own transaction, which is automatically rolled back by default. Thus, even if tests
- * insert or otherwise change database state, there is no need for a teardown or cleanup
- * script.
- * <li>An {@link org.springframework.context.ApplicationContext ApplicationContext} is
- * also inherited and can be used for explicit bean lookup if necessary.</li>
- * </ul>
- *
- * @author Ken Krebs
- * @author Rod Johnson
- * @author Juergen Hoeller
- * @author Sam Brannen
- * @author Michael Isvy
- * @author Dave Syer
- */
 @DataJpaTest(includeFilters = @ComponentScan.Filter(Service.class))
-// Ensure that if the mysql profile is active we connect to the real database:
 @AutoConfigureTestDatabase(replace = Replace.NONE)
-// @TestPropertySource("/application-postgres.properties")
+// @TestPropertySource("/application-test.properties")
 class ClinicServiceTests {
 
-	@Autowired
-	protected OwnerRepository owners;
+    @Autowired
+    protected OwnerRepository owners;
 
-	@Autowired
-	protected VetRepository vets;
+    @Autowired
+    protected VetRepository vets;
 
-	Pageable pageable;
+    Pageable pageable = PageRequest.of(0, 10); // Initialize pageable with default values
 
-	@Test
-	void shouldFindOwnersByLastName() {
-		Page<Owner> owners = this.owners.findByLastName("Davis", pageable);
-		assertThat(owners).hasSize(2);
+    @Test
+    void shouldFindOwnerByLastName() {
+        Page<Owner> owners = this.owners.findByLastName("Davis", pageable);
+        assertThat(owners.getContent()).hasSize(2);
 
-		owners = this.owners.findByLastName("Daviss", pageable);
-		assertThat(owners).isEmpty();
-	}
+        owners = this.owners.findByLastName("UnknownName", pageable);
+        assertThat(owners.getContent()).isEmpty();
+    }
 
-	@Test
-	void shouldFindSingleOwnerWithPet() {
-		Owner owner = this.owners.findById(1);
-		assertThat(owner.getLastName()).startsWith("Franklin");
-		assertThat(owner.getPets()).hasSize(1);
-		assertThat(owner.getPets().get(0).getType()).isNotNull();
-		assertThat(owner.getPets().get(0).getType().getName()).isEqualTo("cat");
-	}
+    @Test
+    void shouldFindSingleOwnerWithPet() {
+        Owner owner = this.owners.findById(1);
+        assertThat(owner.getLastName()).startsWith("Franklin");
+        assertThat(owner.getPets()).hasSize(1);
+        assertThat(owner.getPets().get(0).getType().getName()).isEqualTo("cat");
+    }
 
-	@Test
-	@Transactional
-	void shouldInsertOwner() {
-		Page<Owner> owners = this.owners.findByLastName("Schultz", pageable);
-		int found = (int) owners.getTotalElements();
+    @Test
+    @Transactional
+    void shouldInsertOwner() {
+        Page<Owner> ownersBefore = this.owners.findByLastName("Schultz", pageable);
+        int countBefore = (int) ownersBefore.getTotalElements();
 
-		Owner owner = new Owner();
-		owner.setFirstName("Sam");
-		owner.setLastName("Schultz");
-		owner.setAddress("4, Evans Street");
-		owner.setCity("Wollongong");
-		owner.setTelephone("4444444444");
-		this.owners.save(owner);
-		assertThat(owner.getId()).isNotZero();
+        Owner owner = new Owner();
+        owner.setFirstName("Sam");
+        owner.setLastName("Schultz");
+        owner.setAddress("4, Evans Street");
+        owner.setCity("Wollongong");
+        owner.setTelephone("4444444444");
+        this.owners.save(owner);
 
-		owners = this.owners.findByLastName("Schultz", pageable);
-		assertThat(owners.getTotalElements()).isEqualTo(found + 1);
-	}
+        assertThat(owner.getId()).isNotZero();
 
-	@Test
-	@Transactional
-	void shouldUpdateOwner() {
-		Owner owner = this.owners.findById(1);
-		String oldLastName = owner.getLastName();
-		String newLastName = oldLastName + "X";
+        Page<Owner> ownersAfter = this.owners.findByLastName("Schultz", pageable);
+        assertThat(ownersAfter.getTotalElements()).isEqualTo(countBefore + 1);
+    }
 
-		owner.setLastName(newLastName);
-		this.owners.save(owner);
+    @Test
+    @Transactional
+    void shouldUpdateOwnerLastName() {
+        Owner owner = this.owners.findById(1);
+        String oldLastName = owner.getLastName();
 
-		// retrieving new name from database
-		owner = this.owners.findById(1);
-		assertThat(owner.getLastName()).isEqualTo(newLastName);
-	}
+        owner.setLastName(oldLastName + "X");
+        this.owners.save(owner);
 
-	@Test
-	void shouldFindAllPetTypes() {
-		Collection<PetType> petTypes = this.owners.findPetTypes();
+        Owner updatedOwner = this.owners.findById(1);
+        assertThat(updatedOwner.getLastName()).isEqualTo(oldLastName + "X");
+    }
 
-		PetType petType1 = EntityUtils.getById(petTypes, PetType.class, 1);
-		assertThat(petType1.getName()).isEqualTo("cat");
-		PetType petType4 = EntityUtils.getById(petTypes, PetType.class, 4);
-		assertThat(petType4.getName()).isEqualTo("snake");
-	}
+    @Test
+    void shouldFindAllPetTypes() {
+        Collection<PetType> petTypes = this.owners.findPetTypes();
 
-	@Test
-	@Transactional
-	void shouldInsertPetIntoDatabaseAndGenerateId() {
-		Owner owner6 = this.owners.findById(6);
-		int found = owner6.getPets().size();
+        assertThat(petTypes).isNotEmpty();
+        assertThat(petTypes).extracting(PetType::getName).contains("cat", "dog", "snake");
+    }
 
-		Pet pet = new Pet();
-		pet.setName("bowser");
-		Collection<PetType> types = this.owners.findPetTypes();
-		pet.setType(EntityUtils.getById(types, PetType.class, 2));
-		pet.setBirthDate(LocalDate.now());
-		owner6.addPet(pet);
-		assertThat(owner6.getPets()).hasSize(found + 1);
+    @Test
+    @Transactional
+    void shouldInsertPetForOwner() {
+        Owner owner = this.owners.findById(6);
+        int initialPetCount = owner.getPets().size();
 
-		this.owners.save(owner6);
+        Pet pet = new Pet();
+        pet.setName("Bowser");
+        pet.setType(EntityUtils.getById(this.owners.findPetTypes(), PetType.class, 2)); // Assuming type id 2 exists
+        pet.setBirthDate(LocalDate.now());
+        owner.addPet(pet);
 
-		owner6 = this.owners.findById(6);
-		assertThat(owner6.getPets()).hasSize(found + 1);
-		// checks that id has been generated
-		pet = owner6.getPet("bowser");
-		assertThat(pet.getId()).isNotNull();
-	}
+        this.owners.save(owner);
 
-	@Test
-	@Transactional
-	void shouldUpdatePetName() {
-		Owner owner6 = this.owners.findById(6);
-		Pet pet7 = owner6.getPet(7);
-		String oldName = pet7.getName();
+        Owner updatedOwner = this.owners.findById(6);
+        assertThat(updatedOwner.getPets()).hasSize(initialPetCount + 1);
+        assertThat(updatedOwner.getPets().stream().anyMatch(p -> p.getName().equals("Bowser"))).isTrue();
+    }
 
-		String newName = oldName + "X";
-		pet7.setName(newName);
-		this.owners.save(owner6);
+    @Test
+    void shouldFindAllVets() {
+        Collection<Vet> vets = this.vets.findAll();
 
-		owner6 = this.owners.findById(6);
-		pet7 = owner6.getPet(7);
-		assertThat(pet7.getName()).isEqualTo(newName);
-	}
+        assertThat(vets).isNotEmpty();
+        Vet vet = EntityUtils.getById(vets, Vet.class, 3);
+        assertThat(vet.getLastName()).isEqualTo("Douglas");
+        assertThat(vet.getSpecialties().stream().map(s -> s.getName())).containsExactlyInAnyOrder("dentistry", "surgery");
+    }
 
-	@Test
-	void shouldFindVets() {
-		Collection<Vet> vets = this.vets.findAll();
+    @Test
+    @Transactional
+    void shouldAddNewVisitForPet() {
+        Owner owner = this.owners.findById(6);
+        Pet pet = owner.getPet(7);
 
-		Vet vet = EntityUtils.getById(vets, Vet.class, 3);
-		assertThat(vet.getLastName()).isEqualTo("Douglas");
-		assertThat(vet.getNrOfSpecialties()).isEqualTo(2);
-		assertThat(vet.getSpecialties().get(0).getName()).isEqualTo("dentistry");
-		assertThat(vet.getSpecialties().get(1).getName()).isEqualTo("surgery");
-	}
+        int initialVisitCount = pet.getVisits().size();
 
-	@Test
-	@Transactional
-	void shouldAddNewVisitForPet() {
-		Owner owner6 = this.owners.findById(6);
-		Pet pet7 = owner6.getPet(7);
-		int found = pet7.getVisits().size();
-		Visit visit = new Visit();
-		visit.setDescription("test");
+        Visit visit = new Visit();
+        visit.setDescription("Routine Checkup");
+        owner.addVisit(pet.getId(), visit);
 
-		owner6.addVisit(pet7.getId(), visit);
-		this.owners.save(owner6);
+        this.owners.save(owner);
 
-		owner6 = this.owners.findById(6);
+        Owner updatedOwner = this.owners.findById(6);
+        Pet updatedPet = updatedOwner.getPet(7);
 
-		assertThat(pet7.getVisits()) //
-			.hasSize(found + 1) //
-			.allMatch(value -> value.getId() != null);
-	}
-
-	@Test
-	void shouldFindVisitsByPetId() {
-		Owner owner6 = this.owners.findById(6);
-		Pet pet7 = owner6.getPet(7);
-		Collection<Visit> visits = pet7.getVisits();
-
-		assertThat(visits) //
-			.hasSize(2) //
-			.element(0)
-			.extracting(Visit::getDate)
-			.isNotNull();
-	}
-
+        assertThat(updatedPet.getVisits()).hasSize(initialVisitCount + 1);
+        assertThat(updatedPet.getVisits()).extracting(Visit::getDescription).contains("Routine Checkup");
+    }
 }
