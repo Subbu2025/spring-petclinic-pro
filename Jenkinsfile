@@ -4,8 +4,13 @@ pipeline {
     agent any
 
     environment {
-        KUBERNETES_NAMESPACE = '' // Namespace (will be dynamically set)
+        KUBERNETES_NAMESPACE = '' // Namespace (dynamically set based on branch)
         TARGET_ENV = ''           // Deployment environment (dev-qa, uat, or prod)
+        ECR_URL = '905418425077.dkr.ecr.ap-south-1.amazonaws.com' // AWS ECR URL
+        IMAGE_NAME = 'spring-petclinic' // Docker image name
+        GITHUB_CREDENTIALS_ID = 'Subbu2025_github-creds' // GitHub credentials ID
+        AWS_CREDENTIALS_ID = 'aws-eks-credentials'       // AWS credentials ID
+        GITHUB_REPO_URL = 'https://github.com/Subbu2025/spring-petclinic-pro.git' // GitHub repo URL
     }
 
     stages {
@@ -63,12 +68,24 @@ pipeline {
             }
         }
 
-        stage('Checkout Code') {
+        stage('Clone Helm Charts Repository') {
+            steps {
+                script {
+                    git(
+                        url: 'https://github.com/Subbu2025/PetClinic-Helm-Charts.git',
+                        credentialsId: GITHUB_CREDENTIALS_ID,
+                        branch: 'main'
+                    )
+                }
+            }
+        }
+
+        stage('Checkout Application Code') {
             steps {
                 script {
                     checkoutCode(
-                        url: 'https://github.com/Subbu2025/spring-petclinic-pro.git',
-                        credentialsId: 'Subbu2025_github-creds',
+                        url: GITHUB_REPO_URL,
+                        credentialsId: GITHUB_CREDENTIALS_ID,
                         branch: env.BRANCH_NAME
                     )
                 }
@@ -92,7 +109,7 @@ pipeline {
                 script {
                     sonarQubeAnalysis(
                         namespace: KUBERNETES_NAMESPACE,
-                        awsCredentialsId: 'aws-eks-credentials'
+                        awsCredentialsId: AWS_CREDENTIALS_ID
                     )
                 }
             }
@@ -102,10 +119,24 @@ pipeline {
             steps {
                 script {
                     dockerBuildAndPushScript(
-                        imageName: "spring-petclinic",
-                        awsCredentialsId: 'aws-eks-credentials',
-                        ecrUrl: '905418425077.dkr.ecr.ap-south-1.amazonaws.com'
+                        imageName: IMAGE_NAME,
+                        awsCredentialsId: AWS_CREDENTIALS_ID,
+                        ecrUrl: ECR_URL
                     )
+                }
+            }
+        }
+
+        stage('Deploy Using Helm Charts') {
+            steps {
+                script {
+                    dir('charts/petclinic-chart') { // Navigate to the cloned Helm chart directory
+                        sh """
+                            helm upgrade --install petclinic-app . \
+                              -n ${KUBERNETES_NAMESPACE} --create-namespace \
+                              --set namespace=${KUBERNETES_NAMESPACE},image.repository=${ECR_URL}/${IMAGE_NAME},image.tag=latest
+                        """
+                    }
                 }
             }
         }
