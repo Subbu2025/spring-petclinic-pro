@@ -18,13 +18,14 @@ pipeline {
                         TARGET_ENV = 'dev-qa'
                     } else if (env.BRANCH_NAME == 'main') {
                         // Ask the user for UAT or Prod deployment
-                        input message: "Deploy to which environment?", parameters: [
+                        def userInput = input message: "Deploy to which environment?", parameters: [
                             choice(choices: ['uat', 'prod'], description: 'Choose the deployment environment', name: 'DEPLOY_ENV')
                         ]
-                        if (params.DEPLOY_ENV == 'uat') {
+
+                        if (userInput == 'uat') {
                             KUBERNETES_NAMESPACE = 'petclinic-uat'
                             TARGET_ENV = 'uat'
-                        } else if (params.DEPLOY_ENV == 'prod') {
+                        } else if (userInput == 'prod') {
                             KUBERNETES_NAMESPACE = 'petclinic-prod'
                             TARGET_ENV = 'prod'
                         } else {
@@ -33,6 +34,7 @@ pipeline {
                     } else {
                         error "Unknown branch: ${env.BRANCH_NAME}"
                     }
+
                     echo "Target environment: ${TARGET_ENV}"
                     echo "Target namespace: ${KUBERNETES_NAMESPACE}"
                 }
@@ -55,10 +57,10 @@ pipeline {
 
     post {
         success {
-            echo "Code checkout completed successfully for branch: ${env.BRANCH_NAME}, environment: ${TARGET_ENV}"
+            echo "Pipeline completed successfully for branch: ${env.BRANCH_NAME}, environment: ${TARGET_ENV}"
         }
         failure {
-            echo "Code checkout failed for branch: ${env.BRANCH_NAME}"
+            echo "Pipeline failed for branch: ${env.BRANCH_NAME}"
         }
     }
 }
