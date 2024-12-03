@@ -73,6 +73,18 @@ pipeline {
                 }
             }
         }
+
+    stage('Unit Testing') {
+        steps {
+            script {
+                runTests(
+                    testCommand: './mvnw test',
+                    stageName: 'Unit Tests'
+                )
+            }
+        }
+    }
+
     }
 
     post {
