@@ -75,18 +75,23 @@ pipeline {
             }
         }
 
-        stage('Unit Testing') {
-            steps {
-                script {
-                    unitTest(
-                        testCommand: './mvnw clean test -Dtest=*',
-                        stageName: 'Unit Tests',
-                        reportDir: 'target/surefire-reports'
-                    )
-                }
+    stage('Unit Testing') {
+    steps {
+        script {
+            try {
+                unitTest(
+                    testCommand: './mvnw clean test -Dsurefire.reportFormat=xml',
+                    stageName: 'Unit Tests',
+                    reportDir: 'target/surefire-reports'
+                )
+            } catch (Exception e) {
+                archiveArtifacts artifacts: 'target/surefire-reports/*'
+                error "Tests failed. See reports for details."
             }
         }
     }
+}
+}
 
     post {
         success {
