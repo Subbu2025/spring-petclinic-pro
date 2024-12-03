@@ -75,23 +75,41 @@ pipeline {
             }
         }
 
-    stage('Unit Testing') {
-    steps {
-        script {
-            try {
-                unitTest(
-                    testCommand: './mvnw clean test -Dsurefire.reportFormat=xml',
-                    stageName: 'Unit Tests',
-                    reportDir: 'target/surefire-reports'
-                )
-            } catch (Exception e) {
-                archiveArtifacts artifacts: 'target/surefire-reports/*'
-                error "Tests failed. See reports for details."
+        stage('Unit Testing') {
+            steps {
+                script {
+                    unitTest(
+                        testCommand: './mvnw clean test -Dsurefire.reportFormat=xml',
+                        stageName: 'Unit Tests',
+                        reportDir: 'target/surefire-reports'
+                    )
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    sonarQubeIntegrationScript(
+                        namespace: KUBERNETES_NAMESPACE,
+                        awsCredentialsId: 'aws-credentials-id'
+                    )
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    dockerBuildAndPushScript(
+                        imageName: "spring-petclinic",
+                        awsCredentialsId: 'aws-credentials-id',
+                        ecrUrl: '905418425077.dkr.ecr.ap-south-1.amazonaws.com'
+                    )
+                }
             }
         }
     }
-}
-}
 
     post {
         success {
