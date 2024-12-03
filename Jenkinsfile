@@ -86,6 +86,29 @@ pipeline {
                 }
             }
         }
+
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    sonarQubeIntegrationScript(
+                        namespace: KUBERNETES_NAMESPACE,
+                        awsCredentialsId: 'aws-credentials-id'
+                    )
+                }
+            }
+        }
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    dockerBuildAndPushScript(
+                        imageName: "spring-petclinic",
+                        awsCredentialsId: 'aws-credentials-id',
+                        ecrUrl: '905418425077.dkr.ecr.ap-south-1.amazonaws.com'
+                    )
+                }
+            }
+        }
     }
 
     post {
