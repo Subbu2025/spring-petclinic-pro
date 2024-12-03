@@ -12,12 +12,10 @@ pipeline {
         stage('Setup') {
             steps {
                 script {
-                    // Branch-to-Environment Mapping
                     if (env.BRANCH_NAME == 'develop') {
                         KUBERNETES_NAMESPACE = 'petclinic-dev-qa'
                         TARGET_ENV = 'dev-qa'
                     } else if (env.BRANCH_NAME == 'main') {
-                        // Ask the user for UAT or Prod deployment
                         def userInput = input message: "Deploy to which environment?", parameters: [
                             choice(choices: ['uat', 'prod'], description: 'Choose the deployment environment', name: 'DEPLOY_ENV')
                         ]
@@ -26,6 +24,23 @@ pipeline {
                             KUBERNETES_NAMESPACE = 'petclinic-uat'
                             TARGET_ENV = 'uat'
                         } else if (userInput == 'prod') {
+                            // Email stakeholders
+                            mail to: 'ssrmca07@gmail.com',
+                                subject: "Production Deployment Approval Required",
+                                body: "A request to deploy to production has been made. Please confirm before proceeding."
+
+                            // Restrict prod approval to authorized personnel
+                            def approver = input message: "Only authorized personnel can approve PROD deployments. Enter your username to confirm.", parameters: [
+                                string(name: 'APPROVER', description: 'Enter your username')
+                            ]
+
+                            if (approver != 'admin') { // Replace 'AdminUser' with actual username
+                                error "Unauthorized user attempted to approve a production deployment."
+                            }
+
+                            // Final confirmation
+                            input message: "Are you sure you want to deploy to PROD? This action is irreversible.", ok: "Yes, Deploy to PROD"
+
                             KUBERNETES_NAMESPACE = 'petclinic-prod'
                             TARGET_ENV = 'prod'
                         } else {
@@ -44,7 +59,6 @@ pipeline {
         stage('Checkout Code') {
             steps {
                 script {
-                    // Use the shared library to check out the code
                     checkoutCode(
                         url: 'https://github.com/Subbu2025/spring-petclinic-pro.git',
                         credentialsId: 'Subbu2025_github-creds',
