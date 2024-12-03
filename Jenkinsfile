@@ -26,26 +26,27 @@ pipeline {
                         } else if (userInput == 'prod') {
                             // Email stakeholders
                             mail to: 'ssrmca07@gmail.com',
-                            subject: "Production Deployment Approval Required",
-                            body: """
-                            A request to deploy to production has been made. Please confirm before proceeding.
-                            Pipeline: ${env.JOB_NAME}
-                            Build Number: ${env.BUILD_NUMBER}
-                            Link to approve or reject: ${env.BUILD_URL}
-                            """
-
+                                subject: "Production Deployment Approval Required",
+                                body: """
+                                A request to deploy to production has been made. Please confirm before proceeding.
+                                Pipeline: ${env.JOB_NAME}
+                                Build Number: ${env.BUILD_NUMBER}
+                                Link to approve or reject: ${env.BUILD_URL}
+                                """
 
                             // Restrict prod approval to authorized personnel
                             def approver = input message: "Only authorized personnel can approve PROD deployments. Enter your username to confirm.", parameters: [
                                 string(name: 'APPROVER', description: 'Enter your username')
                             ]
 
-                            if (approver != 'admin') { // Replace 'AdminUser' with actual username
+                            if (approver != 'admin') {
                                 error "Unauthorized user attempted to approve a production deployment."
                             }
 
                             // Final confirmation
-                            input message: "Are you sure you want to deploy to PROD? This action is irreversible.", ok: "Yes, Deploy to PROD"
+                            timeout(time: 10, unit: 'MINUTES') {
+                                input message: "Are you sure you want to deploy to PROD? This action is irreversible.", ok: "Yes, Deploy to PROD"
+                            }
 
                             KUBERNETES_NAMESPACE = 'petclinic-prod'
                             TARGET_ENV = 'prod'
@@ -74,17 +75,17 @@ pipeline {
             }
         }
 
-    stage('Unit Testing') {
-        steps {
-            script {
-                runTests(
-                    testCommand: './mvnw test',
-                    stageName: 'Unit Tests'
-                )
+        stage('Unit Testing') {
+            steps {
+                script {
+                    runTests(
+                        testCommand: './mvnw test',
+                        stageName: 'Unit Tests',
+                        reportDir: 'target/surefire-reports'
+                    )
+                }
             }
         }
-    }
-
     }
 
     post {
