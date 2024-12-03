@@ -80,7 +80,7 @@ pipeline {
         script {
             try {
                 unitTest(
-                    testCommand: './mvnw clean test -Dsurefire.reportFormat=xml',
+                    testCommand: './mvnw clean test -Dtest=*',
                     stageName: 'Unit Tests',
                     reportDir: 'target/surefire-reports'
                 )
