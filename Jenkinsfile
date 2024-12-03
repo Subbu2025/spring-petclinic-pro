@@ -79,7 +79,7 @@ pipeline {
             steps {
                 script {
                     unitTest(
-                        testCommand: './mvnw test',
+                        testCommand: './mvnw clean test -Dsurefire.reportFormat=xml',
                         stageName: 'Unit Tests',
                         reportDir: 'target/surefire-reports'
                     )
