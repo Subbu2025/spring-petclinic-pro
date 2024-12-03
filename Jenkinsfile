@@ -1,3 +1,5 @@
+@Library('petclinic-shared-library') _
+
 pipeline {
     agent any
 
