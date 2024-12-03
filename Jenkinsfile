@@ -90,7 +90,7 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 script {
-                    sonarQubeIntegrationScript(
+                    sonarQubeAnalysis(
                         namespace: KUBERNETES_NAMESPACE,
                         awsCredentialsId: 'aws-credentials-id'
                     )
