@@ -92,7 +92,7 @@ pipeline {
                 script {
                     sonarQubeAnalysis(
                         namespace: KUBERNETES_NAMESPACE,
-                        awsCredentialsId: 'aws-credentials-id'
+                        awsCredentialsId: 'aws-eks-credentials'
                     )
                 }
             }
@@ -103,7 +103,7 @@ pipeline {
                 script {
                     dockerBuildAndPushScript(
                         imageName: "spring-petclinic",
-                        awsCredentialsId: 'aws-credentials-id',
+                        awsCredentialsId: 'aws-eks-credentials',
                         ecrUrl: '905418425077.dkr.ecr.ap-south-1.amazonaws.com'
                     )
                 }
