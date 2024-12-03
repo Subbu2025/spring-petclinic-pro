@@ -78,7 +78,7 @@ pipeline {
         stage('Unit Testing') {
             steps {
                 script {
-                    runTests(
+                    unitTest(
                         testCommand: 'mvn test',
                         stageName: 'Unit Tests',
                         reportDir: 'target/surefire-reports'
