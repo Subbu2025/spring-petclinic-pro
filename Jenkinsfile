@@ -26,8 +26,14 @@ pipeline {
                         } else if (userInput == 'prod') {
                             // Email stakeholders
                             mail to: 'ssrmca07@gmail.com',
-                                subject: "Production Deployment Approval Required",
-                                body: "A request to deploy to production has been made. Please confirm before proceeding."
+                            subject: "Production Deployment Approval Required",
+                            body: """
+                            A request to deploy to production has been made. Please confirm before proceeding.
+                            Pipeline: ${env.JOB_NAME}
+                            Build Number: ${env.BUILD_NUMBER}
+                            Link to approve or reject: ${env.BUILD_URL}
+                            """
+
 
                             // Restrict prod approval to authorized personnel
                             def approver = input message: "Only authorized personnel can approve PROD deployments. Enter your username to confirm.", parameters: [
