@@ -4,18 +4,21 @@ pipeline {
     agent any
 
     environment {
-        KUBERNETES_NAMESPACE = '' // Namespace (will be dynamically set)
-        TARGET_ENV = ''           // Deployment environment (dev-qa, uat, or prod)
+        KUBERNETES_NAMESPACE = '' // Namespace dynamically set
+        TARGET_ENV = ''           // Environment (dev-qa, uat, or prod)
+        HELM_RELEASE_NAME = ''    // Release name dynamically set
     }
 
     stages {
-        stage('Setup') {
+        stage('Setup Environment') {
             steps {
                 script {
                     if (env.BRANCH_NAME == 'develop') {
                         KUBERNETES_NAMESPACE = 'petclinic-dev-qa'
                         TARGET_ENV = 'dev-qa'
+                        HELM_RELEASE_NAME = 'petclinic-dev-qa'
                     } else if (env.BRANCH_NAME == 'main') {
+                        // Manual environment selection for main branch
                         def userInput = input message: "Deploy to which environment?", parameters: [
                             choice(choices: ['uat', 'prod'], description: 'Choose the deployment environment', name: 'DEPLOY_ENV')
                         ]
@@ -23,19 +26,20 @@ pipeline {
                         if (userInput == 'uat') {
                             KUBERNETES_NAMESPACE = 'petclinic-uat'
                             TARGET_ENV = 'uat'
+                            HELM_RELEASE_NAME = 'petclinic-uat'
                         } else if (userInput == 'prod') {
-                            // Email stakeholders
-                            mail to: 'ssrmca07@gmail.com',
-                                subject: "Production Deployment Approval Required",
-                                body: """
-                                A request to deploy to production has been made. Please confirm before proceeding.
-                                Pipeline: ${env.JOB_NAME}
-                                Build Number: ${env.BUILD_NUMBER}
-                                Link to approve or reject: ${env.BUILD_URL}
-                                """
+                            // Notify stakeholders for production approval
+                            mail to: 'stakeholders@example.com',
+                                 subject: "Production Deployment Approval Required",
+                                 body: """
+                                 A request to deploy to production has been made.
+                                 Pipeline: ${env.JOB_NAME}
+                                 Build Number: ${env.BUILD_NUMBER}
+                                 Link: ${env.BUILD_URL}
+                                 """
 
                             // Restrict prod approval to authorized personnel
-                            def approver = input message: "Only authorized personnel can approve PROD deployments. Enter your username to confirm.", parameters: [
+                            def approver = input message: "Only authorized personnel can approve PROD deployments. Enter your username:", parameters: [
                                 string(name: 'APPROVER', description: 'Enter your username')
                             ]
 
@@ -45,20 +49,21 @@ pipeline {
 
                             // Final confirmation
                             timeout(time: 10, unit: 'MINUTES') {
-                                input message: "Are you sure you want to deploy to PROD? This action is irreversible.", ok: "Yes, Deploy to PROD"
+                                input message: "Confirm deployment to PROD. This action is irreversible.", ok: "Yes, Deploy"
                             }
 
                             KUBERNETES_NAMESPACE = 'petclinic-prod'
                             TARGET_ENV = 'prod'
+                            HELM_RELEASE_NAME = 'petclinic-prod'
                         } else {
                             error "Invalid deployment environment selected."
                         }
                     } else {
-                        error "Unknown branch: ${env.BRANCH_NAME}"
+                        error "Unsupported branch: ${env.BRANCH_NAME}"
                     }
 
-                    echo "Target environment: ${TARGET_ENV}"
-                    echo "Target namespace: ${KUBERNETES_NAMESPACE}"
+                    echo "Target Environment: ${TARGET_ENV}"
+                    echo "Kubernetes Namespace: ${KUBERNETES_NAMESPACE}"
                 }
             }
         }
@@ -68,44 +73,46 @@ pipeline {
                 script {
                     checkoutCode(
                         url: 'https://github.com/Subbu2025/spring-petclinic-pro.git',
-                        credentialsId: 'Subbu2025_github-creds',
+                        credentialsId: 'github-credentials',
                         branch: env.BRANCH_NAME
                     )
                 }
             }
         }
 
-        stage('Unit Testing') {
+        stage('Deploy MySQL') {
             steps {
                 script {
-                    unitTest(
-                        testCommand: './mvnw clean test -Dsurefire.reportFormat=xml',
-                        stageName: 'Unit Tests',
-                        reportDir: 'target/surefire-reports'
-                    )
+                    sh """
+                    helm upgrade --install mysql-${TARGET_ENV} ./charts/mysql-chart \
+                      -f ./charts/mysql-chart/environments/${TARGET_ENV}/mysql-values.yaml \
+                      -n ${KUBERNETES_NAMESPACE}
+                    """
                 }
             }
         }
 
-        stage('SonarQube Analysis') {
+        stage('Deploy PetClinic') {
             steps {
                 script {
-                    sonarQubeIntegrationScript(
-                        namespace: KUBERNETES_NAMESPACE,
-                        awsCredentialsId: 'aws-credentials-id'
-                    )
+                    sh """
+                    helm upgrade --install ${HELM_RELEASE_NAME} ./charts/petclinic-chart \
+                      -f ./charts/petclinic-chart/environments/${TARGET_ENV}/petclinic-values.yaml \
+                      -n ${KUBERNETES_NAMESPACE}
+                    """
                 }
             }
         }
 
-        stage('Build Docker Image') {
+        stage('Run Helm Tests') {
+            when {
+                expression { TARGET_ENV != 'prod' } // Skip Helm tests for production
+            }
             steps {
                 script {
-                    dockerBuildAndPushScript(
-                        imageName: "spring-petclinic",
-                        awsCredentialsId: 'aws-credentials-id',
-                        ecrUrl: '905418425077.dkr.ecr.ap-south-1.amazonaws.com'
-                    )
+                    sh """
+                    helm test ${HELM_RELEASE_NAME} -n ${KUBERNETES_NAMESPACE}
+                    """
                 }
             }
         }
@@ -113,10 +120,10 @@ pipeline {
 
     post {
         success {
-            echo "Pipeline completed successfully for branch: ${env.BRANCH_NAME}, environment: ${TARGET_ENV}"
+            echo "Deployment completed successfully for ${TARGET_ENV}."
         }
         failure {
-            echo "Pipeline failed for branch: ${env.BRANCH_NAME}"
+            echo "Deployment failed for ${TARGET_ENV}."
         }
     }
 }
