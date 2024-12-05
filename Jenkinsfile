@@ -6,7 +6,7 @@ pipeline {
     environment {
         KUBERNETES_NAMESPACE = '' // Namespace dynamically set
         TARGET_ENV = ''           // Environment (dev-qa, uat, or prod)
-        HELM_RELEASE_NAME = ''    // Release name dynamically set
+        HELM_RELEASE_NAME = ''    // Helm release name dynamically set
     }
 
     stages {
@@ -18,7 +18,7 @@ pipeline {
                         TARGET_ENV = 'dev-qa'
                         HELM_RELEASE_NAME = 'petclinic-dev-qa'
                     } else if (env.BRANCH_NAME == 'main') {
-                        // Manual environment selection for main branch
+                        // Prompt user for environment selection
                         def userInput = input message: "Deploy to which environment?", parameters: [
                             choice(choices: ['uat', 'prod'], description: 'Choose the deployment environment', name: 'DEPLOY_ENV')
                         ]
@@ -28,17 +28,17 @@ pipeline {
                             TARGET_ENV = 'uat'
                             HELM_RELEASE_NAME = 'petclinic-uat'
                         } else if (userInput == 'prod') {
-                            // Notify stakeholders for production approval
+                            // Notify stakeholders for production deployment
                             mail to: 'stakeholders@example.com',
-                                 subject: "Production Deployment Approval Required",
-                                 body: """
-                                 A request to deploy to production has been made.
-                                 Pipeline: ${env.JOB_NAME}
-                                 Build Number: ${env.BUILD_NUMBER}
-                                 Link: ${env.BUILD_URL}
-                                 """
+                                subject: "Production Deployment Approval Required",
+                                body: """
+                                A request to deploy to production has been made.
+                                Pipeline: ${env.JOB_NAME}
+                                Build Number: ${env.BUILD_NUMBER}
+                                Link: ${env.BUILD_URL}
+                                """
 
-                            // Restrict prod approval to authorized personnel
+                            // Restrict production approval to authorized personnel
                             def approver = input message: "Only authorized personnel can approve PROD deployments. Enter your username:", parameters: [
                                 string(name: 'APPROVER', description: 'Enter your username')
                             ]
@@ -47,7 +47,7 @@ pipeline {
                                 error "Unauthorized user attempted to approve a production deployment."
                             }
 
-                            // Final confirmation
+                            // Final confirmation before deploying to production
                             timeout(time: 10, unit: 'MINUTES') {
                                 input message: "Confirm deployment to PROD. This action is irreversible.", ok: "Yes, Deploy"
                             }
@@ -64,6 +64,21 @@ pipeline {
 
                     echo "Target Environment: ${TARGET_ENV}"
                     echo "Kubernetes Namespace: ${KUBERNETES_NAMESPACE}"
+                }
+            }
+        }
+
+        stage('Setup Kubernetes Access') {
+            steps {
+                script {
+                    withCredentials([[
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'aws-eks-credentials'
+                    ]]) {
+                        sh """
+                        aws eks update-kubeconfig --region ap-south-1 --name devops-petclinicapp-${TARGET_ENV}
+                        """
+                    }
                 }
             }
         }
