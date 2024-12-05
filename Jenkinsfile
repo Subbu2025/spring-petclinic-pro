@@ -105,14 +105,22 @@ pipeline {
         stage('Deploy MySQL') {
             steps {
                 script {
-                    sh """
-                    helm upgrade --install mysql-${TARGET_ENV} ./charts/mysql-chart \
-                      -f ./charts/mysql-chart/environments/${TARGET_ENV}/mysql-values.yaml \
-                      -n ${KUBERNETES_NAMESPACE}
-                    """
+                    withCredentials([[
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'aws-eks-credentials'
+                    ]]) {
+                        sh """
+                        AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \
+                        AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \
+                        helm upgrade --install mysql-${TARGET_ENV} ./charts/mysql-chart \
+                          -f ./charts/mysql-chart/environments/${TARGET_ENV}/mysql-values.yaml \
+                          -n ${KUBERNETES_NAMESPACE}
+                        """
+                    }
                 }
             }
         }
+
 
         stage('Deploy PetClinic') {
             steps {
