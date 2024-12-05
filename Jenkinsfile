@@ -66,21 +66,29 @@ pipeline {
                 script {
                     withCredentials([[ 
                         $class: 'AmazonWebServicesCredentialsBinding', 
-                        credentialsId: 'aws-eks-credentials'
+                        credentialsId: 'aws-eks-credentials' 
                     ]]) {
                         echo "Validating AWS credentials and updating kubeconfig..."
                         sh """
+                        echo "AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID"
+                        echo "AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY"
+                        
+                        # Validate AWS Credentials
                         aws sts get-caller-identity
+        
+                        # Update kubeconfig for the EKS cluster
                         aws eks update-kubeconfig \
                             --region ap-south-1 \
                             --name devops-petclinicapp-dev-ap-south-1
-
-                        kubectl get pods -n ${KUBERNETES_NAMESPACE}
+                        
+                        # Validate Kubernetes cluster access
+                        kubectl get nodes --kubeconfig /var/lib/jenkins/.kube/config
                         """
                     }
                 }
             }
         }
+
 
         stage('Load ConfigMaps and Secrets') {
             steps {
