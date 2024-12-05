@@ -85,17 +85,24 @@ pipeline {
         stage('Load ConfigMaps and Secrets') {
             steps {
                 script {
-                    echo "Loading ConfigMaps and Secrets for ${TARGET_ENV}..."
+                    echo "Loading ConfigMaps and Secrets for ${TARGET_ENV} using Helm..."
                     sh """
-                    # Apply ConfigMap for non-sensitive configurations
-                    kubectl apply -f ./charts/mysql-chart/environments/${TARGET_ENV}/configmap.yaml -n ${KUBERNETES_NAMESPACE}
-
-                    # Apply ExternalSecret for secrets managed in AWS Secrets Manager
-                    kubectl apply -f ./charts/mysql-chart/environments/${TARGET_ENV}/externalsecret.yaml -n ${KUBERNETES_NAMESPACE}
+                    # Deploy ConfigMap and Secrets via Helm for MySQL
+                    helm upgrade --install mysql-${TARGET_ENV} ./charts/mysql-chart \
+                      -f ./charts/mysql-chart/environments/${TARGET_ENV}/mysql-values.yaml \
+                      -n ${KUBERNETES_NAMESPACE} \
+                      --kubeconfig /var/lib/jenkins/.kube/config
+        
+                    # Deploy ConfigMap and Secrets via Helm for PetClinic
+                    helm upgrade --install ${HELM_RELEASE_NAME} ./charts/petclinic-chart \
+                      -f ./charts/petclinic-chart/environments/${TARGET_ENV}/petclinic-values.yaml \
+                      -n ${KUBERNETES_NAMESPACE} \
+                      --kubeconfig /var/lib/jenkins/.kube/config
                     """
                 }
             }
         }
+
 
         stage('Deploy MySQL') {
             steps {
