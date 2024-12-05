@@ -4,8 +4,8 @@ pipeline {
     agent any
 
     environment {
-        KUBERNETES_NAMESPACE = '' // Namespace dynamically set
-        TARGET_ENV = ''           // Environment (dev-qa, uat, or prod)
+        KUBERNETES_NAMESPACE = 'petclinic-dev-qa' // Namespace dynamically set
+        TARGET_ENV = 'dev-qa'           // Environment (dev-qa, uat, or prod)
         HELM_RELEASE_NAME = ''    // Helm release name dynamically set
     }
 
@@ -29,7 +29,7 @@ pipeline {
                             HELM_RELEASE_NAME = 'petclinic-uat'
                         } else if (userInput == 'prod') {
                             // Notify stakeholders for production deployment
-                            mail to: 'stakeholders@example.com',
+                            mail to: 'ssrmca07@gmail.com',
                                 subject: "Production Deployment Approval Required",
                                 body: """
                                 A request to deploy to production has been made.
@@ -76,7 +76,7 @@ pipeline {
                         credentialsId: 'aws-eks-credentials'
                     ]]) {
                         sh """
-                        aws eks update-kubeconfig --region ap-south-1 --name devops-petclinicapp-${TARGET_ENV}
+                        aws eks update-kubeconfig --region ap-south-1 --name devops-petclinicapp-dev-ap-south-1-${TARGET_ENV}
                         """
                     }
                 }
