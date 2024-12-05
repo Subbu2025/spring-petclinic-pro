@@ -76,7 +76,8 @@ pipeline {
                         credentialsId: 'aws-eks-credentials'
                     ]]) {
                         sh """
-                        aws eks update-kubeconfig --region ap-south-1 --name devops-petclinicapp-dev-ap-south-1-${TARGET_ENV}
+                        # Update kubeconfig for the existing cluster
+                        aws eks update-kubeconfig --region ap-south-1 --name devops-petclinicapp-dev-ap-south-1
                         """
                     }
                 }
