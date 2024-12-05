@@ -94,19 +94,18 @@ pipeline {
             steps {
                 script {
                     echo "Loading ConfigMaps and Secrets for ${TARGET_ENV} using Helm..."
-                    sh """
-                    # Deploy ConfigMap and Secrets via Helm for MySQL
-                    helm upgrade --install mysql-${TARGET_ENV} ./charts/mysql-chart \
-                      -f ./charts/mysql-chart/environments/${TARGET_ENV}/mysql-values.yaml \
-                      -n ${KUBERNETES_NAMESPACE} \
-                      --kubeconfig /var/lib/jenkins/.kube/config
-        
-                    # Deploy ConfigMap and Secrets via Helm for PetClinic
-                    helm upgrade --install ${HELM_RELEASE_NAME} ./charts/petclinic-chart \
-                      -f ./charts/petclinic-chart/environments/${TARGET_ENV}/petclinic-values.yaml \
-                      -n ${KUBERNETES_NAMESPACE} \
-                      --kubeconfig /var/lib/jenkins/.kube/config
-                    """
+                    withCredentials([
+                        [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-eks-credentials']
+                    ]) {
+                        sh """
+                        AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
+                        AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
+                        helm upgrade --install mysql-${TARGET_ENV} ./charts/mysql-chart \
+                          -f ./charts/mysql-chart/environments/${TARGET_ENV}/mysql-values.yaml \
+                          -n ${KUBERNETES_NAMESPACE} \
+                          --kubeconfig /var/lib/jenkins/.kube/config --debug
+                        """
+                    }
                 }
             }
         }
