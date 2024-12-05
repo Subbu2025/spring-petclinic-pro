@@ -75,14 +75,20 @@ pipeline {
                         $class: 'AmazonWebServicesCredentialsBinding',
                         credentialsId: 'aws-eks-credentials'
                     ]]) {
+                        echo "Validating AWS credentials and updating kubeconfig..."
                         sh """
-                        # Update kubeconfig for the existing cluster
-                        aws eks update-kubeconfig --region ap-south-1 --name devops-petclinicapp-dev-ap-south-1
+                        aws sts get-caller-identity      # Debug AWS credentials
+                        aws eks list-clusters            # Debug cluster visibility
+                        aws eks update-kubeconfig \
+                            --region ap-south-1 \
+                            --name devops-petclinicapp-dev-ap-south-1
                         """
+                        echo "Kubeconfig updated successfully!"
                     }
                 }
             }
         }
+
 
         stage('Checkout Code') {
             steps {
