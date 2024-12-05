@@ -54,7 +54,7 @@ pipeline {
                         branches: [[name: HELM_CHART_REPO_BRANCH]],
                         userRemoteConfigs: [[
                             url: HELM_CHART_REPO_URL,
-                            credentialsId: 'github-credentials'
+                            credentialsId: 'github-pat'
                         ]]
                     ])
                 }
