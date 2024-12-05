@@ -49,7 +49,7 @@ pipeline {
             steps {
                 script {
                     echo "Cloning Helm charts repository..."
-                    checkout([
+                    checkout([ 
                         $class: 'GitSCM',
                         branches: [[name: HELM_CHART_REPO_BRANCH]],
                         userRemoteConfigs: [[
@@ -64,8 +64,8 @@ pipeline {
         stage('Setup Kubernetes Access') {
             steps {
                 script {
-                    withCredentials([[
-                        $class: 'AmazonWebServicesCredentialsBinding',
+                    withCredentials([[ 
+                        $class: 'AmazonWebServicesCredentialsBinding', 
                         credentialsId: 'aws-eks-credentials'
                     ]]) {
                         echo "Validating AWS credentials and updating kubeconfig..."
@@ -75,7 +75,6 @@ pipeline {
                             --region ap-south-1 \
                             --name devops-petclinicapp-dev-ap-south-1
 
-                        # Debug Kubernetes access
                         kubectl get pods -n ${KUBERNETES_NAMESPACE}
                         """
                     }
@@ -83,11 +82,26 @@ pipeline {
             }
         }
 
+        stage('Load ConfigMaps and Secrets') {
+            steps {
+                script {
+                    echo "Loading ConfigMaps and Secrets for ${TARGET_ENV}..."
+                    sh """
+                    # Apply ConfigMap for non-sensitive configurations
+                    kubectl apply -f ./charts/mysql-chart/environments/${TARGET_ENV}/configmap.yaml -n ${KUBERNETES_NAMESPACE}
+
+                    # Apply ExternalSecret for secrets managed in AWS Secrets Manager
+                    kubectl apply -f ./charts/mysql-chart/environments/${TARGET_ENV}/externalsecret.yaml -n ${KUBERNETES_NAMESPACE}
+                    """
+                }
+            }
+        }
+
         stage('Deploy MySQL') {
             steps {
                 script {
-                    withCredentials([[
-                        $class: 'AmazonWebServicesCredentialsBinding',
+                    withCredentials([[ 
+                        $class: 'AmazonWebServicesCredentialsBinding', 
                         credentialsId: 'aws-eks-credentials'
                     ]]) {
                         sh """
@@ -106,8 +120,8 @@ pipeline {
         stage('Deploy PetClinic') {
             steps {
                 script {
-                    withCredentials([[
-                        $class: 'AmazonWebServicesCredentialsBinding',
+                    withCredentials([[ 
+                        $class: 'AmazonWebServicesCredentialsBinding', 
                         credentialsId: 'aws-eks-credentials'
                     ]]) {
                         sh """
