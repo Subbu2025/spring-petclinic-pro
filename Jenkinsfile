@@ -9,6 +9,7 @@ pipeline {
         HELM_RELEASE_NAME = ''    // Release name dynamically set
         HELM_CHART_REPO_URL = 'https://github.com/Subbu2025/PetClinic-Helm-Charts.git'
         HELM_CHART_REPO_BRANCH = 'main'
+        KUBECONFIG_PATH = '/var/lib/jenkins/.kube/config' // Path to kubeconfig for Jenkins
     }
 
     stages {
@@ -18,7 +19,7 @@ pipeline {
                     if (env.BRANCH_NAME == 'develop') {
                         KUBERNETES_NAMESPACE = 'petclinic-dev-qa'
                         TARGET_ENV = 'dev-qa'
-                        HELM_RELEASE_NAME = 'petclinic-dev-qa'
+                        HELM_RELEASE_NAME = 'mysql-dev-qa'
                     } else if (env.BRANCH_NAME == 'main') {
                         def userInput = input message: "Deploy to which environment?", parameters: [
                             choice(choices: ['uat', 'prod'], description: 'Choose the deployment environment', name: 'DEPLOY_ENV')
@@ -27,11 +28,11 @@ pipeline {
                         if (userInput == 'uat') {
                             KUBERNETES_NAMESPACE = 'petclinic-uat'
                             TARGET_ENV = 'uat'
-                            HELM_RELEASE_NAME = 'petclinic-uat'
+                            HELM_RELEASE_NAME = 'mysql-uat'
                         } else if (userInput == 'prod') {
                             KUBERNETES_NAMESPACE = 'petclinic-prod'
                             TARGET_ENV = 'prod'
-                            HELM_RELEASE_NAME = 'petclinic-prod'
+                            HELM_RELEASE_NAME = 'mysql-prod'
                         } else {
                             error "Invalid deployment environment selected."
                         }
@@ -68,83 +69,58 @@ pipeline {
                         $class: 'AmazonWebServicesCredentialsBinding', 
                         credentialsId: 'aws-eks-credentials' 
                     ]]) {
-                        echo "Validating AWS credentials and updating kubeconfig..."
+                        echo "Updating kubeconfig for EKS cluster access..."
                         sh """
-                        echo "AWS_ACCESS_KEY_ID: $AWS_ACCESS_KEY_ID"
-                        echo "AWS_SECRET_ACCESS_KEY: $AWS_SECRET_ACCESS_KEY"
-                        
-                        # Validate AWS Credentials
                         aws sts get-caller-identity
-        
-                        # Update kubeconfig for the EKS cluster
+                        
                         aws eks update-kubeconfig \
                             --region ap-south-1 \
-                            --name devops-petclinicapp-dev-ap-south-1
-                        
-                        # Validate Kubernetes cluster access
-                        kubectl get nodes --kubeconfig /var/lib/jenkins/.kube/config
+                            --name devops-petclinicapp-dev-ap-south-1 \
+                            --alias devops-petclinicapp
+
+                        kubectl get nodes --kubeconfig ${KUBECONFIG_PATH}
                         """
                     }
                 }
             }
         }
 
-
-        stage('Load ConfigMaps and Secrets') {
-            steps {
-                script {
-                    echo "Loading ConfigMaps and Secrets for ${TARGET_ENV} using Helm..."
-                    withCredentials([
-                        [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-eks-credentials']
-                    ]) {
-                        sh """
-                        AWS_ACCESS_KEY_ID=$AWS_ACCESS_KEY_ID \
-                        AWS_SECRET_ACCESS_KEY=$AWS_SECRET_ACCESS_KEY \
-                        helm upgrade --install mysql-${TARGET_ENV} ./charts/mysql-chart \
-                          -f ./charts/mysql-chart/environments/${TARGET_ENV}/mysql-values.yaml \
-                          -n ${KUBERNETES_NAMESPACE} \
-                          --kubeconfig /var/lib/jenkins/.kube/config --debug
-                        """
-                    }
-                }
-            }
-        }
-
-
-        stage('Deploy MySQL') {
+        stage('Deploy MySQL Chart') {
             steps {
                 script {
                     withCredentials([[ 
                         $class: 'AmazonWebServicesCredentialsBinding', 
-                        credentialsId: 'aws-eks-credentials'
+                        credentialsId: 'aws-eks-credentials' 
                     ]]) {
                         sh """
                         AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \
                         AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \
-                        helm upgrade --install mysql-${TARGET_ENV} ./charts/mysql-chart \
+                        helm upgrade --install ${HELM_RELEASE_NAME} ./charts/mysql-chart \
                           -f ./charts/mysql-chart/environments/${TARGET_ENV}/mysql-values.yaml \
+                          --set serviceAccount.name=secrets-manager-sa \
                           -n ${KUBERNETES_NAMESPACE} \
-                          --kubeconfig /var/lib/jenkins/.kube/config
+                          --kubeconfig ${KUBECONFIG_PATH} --debug
                         """
                     }
                 }
             }
         }
 
-        stage('Deploy PetClinic') {
+        stage('Deploy PetClinic Chart') {
             steps {
                 script {
                     withCredentials([[ 
                         $class: 'AmazonWebServicesCredentialsBinding', 
-                        credentialsId: 'aws-eks-credentials'
+                        credentialsId: 'aws-eks-credentials' 
                     ]]) {
                         sh """
                         AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \
                         AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \
-                        helm upgrade --install ${HELM_RELEASE_NAME} ./charts/petclinic-chart \
+                        helm upgrade --install petclinic ./charts/petclinic-chart \
                           -f ./charts/petclinic-chart/environments/${TARGET_ENV}/petclinic-values.yaml \
+                          --set serviceAccount.name=secrets-manager-sa \
                           -n ${KUBERNETES_NAMESPACE} \
-                          --kubeconfig /var/lib/jenkins/.kube/config
+                          --kubeconfig ${KUBECONFIG_PATH} --debug
                         """
                     }
                 }
@@ -158,7 +134,7 @@ pipeline {
             steps {
                 script {
                     sh """
-                    helm test ${HELM_RELEASE_NAME} -n ${KUBERNETES_NAMESPACE}
+                    helm test ${HELM_RELEASE_NAME} -n ${KUBERNETES_NAMESPACE} --kubeconfig ${KUBECONFIG_PATH}
                     """
                 }
             }
@@ -171,6 +147,7 @@ pipeline {
         }
         failure {
             echo "Deployment failed for ${TARGET_ENV}."
+            sh "kubectl describe po -n ${KUBERNETES_NAMESPACE}" // Debugging output for failed pods
         }
     }
 }
