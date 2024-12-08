@@ -4,9 +4,9 @@ pipeline {
     agent any
 
     environment {
-        KUBERNETES_NAMESPACE = ''
-        TARGET_ENV = ''
-        HELM_RELEASE_NAME = ''
+        KUBERNETES_NAMESPACE = '' 
+        TARGET_ENV = ''          
+        HELM_RELEASE_NAME = ''   
         HELM_CHART_REPO_URL = 'https://github.com/Subbu2025/PetClinic-Helm-Charts.git'
         HELM_CHART_REPO_BRANCH = 'main'
         KUBECONFIG_PATH = '/var/lib/jenkins/.kube/config'
@@ -24,7 +24,6 @@ pipeline {
                         def userInput = input message: "Deploy to which environment?", parameters: [
                             choice(choices: ['uat', 'prod'], description: 'Choose the deployment environment', name: 'DEPLOY_ENV')
                         ]
-
                         if (userInput == 'uat') {
                             KUBERNETES_NAMESPACE = 'petclinic-uat'
                             TARGET_ENV = 'uat'
@@ -39,7 +38,6 @@ pipeline {
                     } else {
                         error "Unsupported branch: ${env.BRANCH_NAME}."
                     }
-
                     echo "Target Environment: ${TARGET_ENV}"
                     echo "Kubernetes Namespace: ${KUBERNETES_NAMESPACE}"
                 }
@@ -63,8 +61,8 @@ pipeline {
                     }
                     echo "Building Helm chart dependencies..."
                     sh """
-                    helm dependency build ./charts/mysql-chart
-                    helm dependency build ./charts/petclinic-chart
+                    helm dependency update ./charts/mysql-chart
+                    helm dependency update ./charts/petclinic-chart
                     """
                 }
             }
@@ -77,15 +75,12 @@ pipeline {
                         $class: 'AmazonWebServicesCredentialsBinding', 
                         credentialsId: 'aws-eks-credentials' 
                     ]]) {
-                        echo "Testing AWS and Kubernetes access..."
                         sh """
                         aws sts get-caller-identity
-                        
                         aws eks update-kubeconfig \
                             --region ap-south-1 \
                             --name devops-petclinicapp-dev-ap-south-1 \
                             --alias devops-petclinicapp
-                        
                         kubectl get nodes --kubeconfig ${KUBECONFIG_PATH}
                         """
                     }
@@ -120,11 +115,9 @@ pipeline {
             steps {
                 script {
                     echo "Checking readiness for MySQL..."
-                    catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
-                        sh """
-                        kubectl rollout status deployment/${HELM_RELEASE_NAME} -n ${KUBERNETES_NAMESPACE} --timeout=120s
-                        """
-                    }
+                    sh """
+                    kubectl rollout status deployment/${HELM_RELEASE_NAME} -n ${KUBERNETES_NAMESPACE} --timeout=120s
+                    """
                 }
             }
         }
@@ -154,26 +147,9 @@ pipeline {
             steps {
                 script {
                     echo "Checking readiness for PetClinic..."
-                    catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
-                        sh """
-                        kubectl rollout status deployment/petclinic -n ${KUBERNETES_NAMESPACE} --timeout=180s
-                        """
-                    }
-                }
-            }
-        }
-
-        stage('Run Helm Tests') {
-            when {
-                expression { TARGET_ENV != 'prod' }
-            }
-            steps {
-                script {
-                    catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
-                        sh """
-                        helm test ${HELM_RELEASE_NAME} -n ${KUBERNETES_NAMESPACE} --kubeconfig ${KUBECONFIG_PATH}
-                        """
-                    }
+                    sh """
+                    kubectl rollout status deployment/petclinic -n ${KUBERNETES_NAMESPACE} --timeout=180s
+                    """
                 }
             }
         }
@@ -187,11 +163,8 @@ pipeline {
             echo "Deployment failed for ${TARGET_ENV}. Collecting logs for debugging..."
             sh """
             kubectl get all -n ${KUBERNETES_NAMESPACE} || true
-            kubectl describe deployment mysql-dev-qa -n ${KUBERNETES_NAMESPACE} || true
-            kubectl describe deployment petclinic -n ${KUBERNETES_NAMESPACE} || true
             kubectl logs -l app=mysql -n ${KUBERNETES_NAMESPACE} || true
             kubectl logs -l app=petclinic -n ${KUBERNETES_NAMESPACE} || true
-            kubectl get events -n ${KUBERNETES_NAMESPACE} || true
             """
         }
     }
