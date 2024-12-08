@@ -61,6 +61,8 @@ pipeline {
                     if (!fileExists('charts')) {
                         error "Charts directory not found! Ensure Helm chart repo is correctly cloned."
                     }
+                    echo "Building dependencies for Helm charts..."
+                    sh "helm dependency build ./charts/petclinic-chart"
                 }
             }
         }
