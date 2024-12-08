@@ -136,60 +136,35 @@ pipeline {
             }
         }
 
-            stage('Apply ConfigMaps and Secrets') {
-                steps {
-                    script {
-                        withCredentials([[ 
-                            $class: 'AmazonWebServicesCredentialsBinding', 
-                            credentialsId: 'aws-eks-credentials' 
-                        ]]) {
-                            echo "Unstashing Helm charts..."
-                            unstash 'helm-charts'
-            
-                            echo "Building Helm dependencies..."
-                            sh """
-                            helm dependency build helm_charts/charts/petclinic-chart
-                            """
-            
-                            echo "Checking and applying ConfigMaps and Secrets..."
-            
-                            def configMapExists = sh(
-                                script: "kubectl get configmap app-config-${TARGET_ENV} -n ${KUBERNETES_NAMESPACE} || echo 'not_found'",
-                                returnStdout: true
-                            ).trim()
-            
-                            if (configMapExists.contains('not_found')) {
-                                echo "ConfigMap not found. Rendering and applying ConfigMap..."
-                                sh """
-                                helm template helm_charts/charts/petclinic-chart \
-                                    --set environment.name=${TARGET_ENV} \
-                                    --set environment.namespace=${KUBERNETES_NAMESPACE} \
-                                    | kubectl apply -f -
-                                """
-                            } else {
-                                echo "ConfigMap already exists."
-                            }
-            
-                            def secretExists = sh(
-                                script: "kubectl get secret ${TARGET_ENV}-secrets -n ${KUBERNETES_NAMESPACE} || echo 'not_found'",
-                                returnStdout: true
-                            ).trim()
-            
-                            if (secretExists.contains('not_found')) {
-                                echo "Secret not found. Rendering and applying ExternalSecret..."
-                                sh """
-                                helm template helm_charts/charts/petclinic-chart \
-                                    --set environment.name=${TARGET_ENV} \
-                                    --set environment.namespace=${KUBERNETES_NAMESPACE} \
-                                    | kubectl apply -f -
-                                """
-                            } else {
-                                echo "Secret already exists."
-                            }
-                        }
+        stage('Apply ConfigMaps and Secrets') {
+            steps {
+                script {
+                    withCredentials([
+                        [
+                            $class: 'AmazonWebServicesCredentialsBinding',
+                            credentialsId: 'aws-eks-credentials'
+                        ]
+                    ]) {
+                        echo "Unstashing Helm charts..."
+                        unstash 'helm-charts'
+                        
+                        echo "Building Helm dependencies..."
+                        sh """
+                        helm dependency build helm_charts/charts/petclinic-chart || exit 1
+                        """
+                        
+                        echo "Rendering and applying ConfigMap..."
+                        sh """
+                        helm template helm_charts/charts/petclinic-chart \
+                            --set environment.name=${TARGET_ENV} \
+                            --set environment.namespace=${KUBERNETES_NAMESPACE} \
+                            --debug | kubectl apply -f - || exit 1
+                        """
                     }
                 }
             }
+        }
+    
 
            
         stage('Validate ConfigMaps and Secrets') {
