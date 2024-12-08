@@ -136,34 +136,43 @@ pipeline {
             }
         }
 
-        stage('Apply ConfigMaps and Secrets') {
-            steps {
-                script {
-                    withCredentials([
-                        [
-                            $class: 'AmazonWebServicesCredentialsBinding',
-                            credentialsId: 'aws-eks-credentials'
-                        ]
-                    ]) {
-                        echo "Unstashing Helm charts..."
-                        unstash 'helm-charts'
-                        
-                        echo "Building Helm dependencies..."
-                        sh """
-                        helm dependency build helm_charts/charts/petclinic-chart || exit 1
-                        """
-                        
-                        echo "Rendering and applying ConfigMap..."
-                        sh """
-                        helm template helm_charts/charts/petclinic-chart \
-                            --set environment.name=${TARGET_ENV} \
-                            --set environment.namespace=${KUBERNETES_NAMESPACE} \
-                            --debug | kubectl apply -f - || exit 1
-                        """
-                    }
-                }
+stage('Apply ConfigMaps and Secrets') {
+    steps {
+        script {
+            withCredentials([
+                [
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-eks-credentials'
+                ]
+            ]) {
+                echo "Unstashing Helm charts..."
+                unstash 'helm-charts'
+
+                echo "Building Helm dependencies..."
+                sh "helm dependency build helm_charts/charts/petclinic-chart || exit 1"
+
+                echo "Rendering and applying ConfigMap..."
+                sh """
+                helm template helm_charts/charts/petclinic-chart \
+                    --set environment.name=dev-qa \
+                    --set environment.namespace=petclinic-dev-qa \
+                    --show-only templates/configmap.yaml \
+                    --debug | kubectl apply -f - || exit 1
+                """
+
+                echo "Rendering and applying Secrets..."
+                sh """
+                helm template helm_charts/charts/petclinic-chart \
+                    --set environment.name=dev-qa \
+                    --set environment.namespace=petclinic-dev-qa \
+                    --show-only templates/externalsecret.yaml \
+                    --debug | kubectl apply -f - || exit 1
+                """
             }
         }
+    }
+}
+
     
 
            
