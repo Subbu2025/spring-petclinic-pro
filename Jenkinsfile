@@ -67,6 +67,27 @@ pipeline {
             }
         }
 
+         stage('Setup Kubernetes Access') {
+            steps {
+                script {
+                    withCredentials([[ 
+                        $class: 'AmazonWebServicesCredentialsBinding', 
+                        credentialsId: 'aws-eks-credentials' 
+                    ]]) {
+                        echo "Updating kubeconfig for EKS cluster access..."
+                        sh """
+                        aws sts get-caller-identity
+                        aws eks update-kubeconfig \
+                            --region ap-south-1 \
+                            --name devops-petclinicapp-dev-ap-south-1 \
+                            --alias devops-petclinicapp
+                        kubectl get nodes --kubeconfig ${KUBECONFIG_PATH}
+                        """
+                    }
+                }
+            }
+        }
+        
          stage('Fetch Helm Charts') {
             steps {
                 script {
@@ -88,26 +109,7 @@ pipeline {
             }
         }
 
-        stage('Setup Kubernetes Access') {
-            steps {
-                script {
-                    withCredentials([[ 
-                        $class: 'AmazonWebServicesCredentialsBinding', 
-                        credentialsId: 'aws-eks-credentials' 
-                    ]]) {
-                        echo "Updating kubeconfig for EKS cluster access..."
-                        sh """
-                        aws sts get-caller-identity
-                        aws eks update-kubeconfig \
-                            --region ap-south-1 \
-                            --name devops-petclinicapp-dev-ap-south-1 \
-                            --alias devops-petclinicapp
-                        kubectl get nodes --kubeconfig ${KUBECONFIG_PATH}
-                        """
-                    }
-                }
-            }
-        }
+        
         
         stage('Validate ConfigMaps and Secrets') {
             steps {
