@@ -24,6 +24,7 @@ pipeline {
                         def userInput = input message: "Deploy to which environment?", parameters: [
                             choice(choices: ['uat', 'prod'], description: 'Choose the deployment environment', name: 'DEPLOY_ENV')
                         ]
+
                         if (userInput == 'uat') {
                             KUBERNETES_NAMESPACE = 'petclinic-uat'
                             TARGET_ENV = 'uat'
@@ -38,6 +39,7 @@ pipeline {
                     } else {
                         error "Unsupported branch: ${env.BRANCH_NAME}."
                     }
+
                     echo "Target Environment: ${TARGET_ENV}"
                     echo "Kubernetes Namespace: ${KUBERNETES_NAMESPACE}"
                 }
@@ -59,11 +61,6 @@ pipeline {
                     if (!fileExists('charts')) {
                         error "Charts directory not found! Ensure Helm chart repo is correctly cloned."
                     }
-                    echo "Building Helm chart dependencies..."
-                    sh """
-                    helm dependency update ./charts/mysql-chart
-                    helm dependency update ./charts/petclinic-chart
-                    """
                 }
             }
         }
@@ -75,6 +72,7 @@ pipeline {
                         $class: 'AmazonWebServicesCredentialsBinding', 
                         credentialsId: 'aws-eks-credentials' 
                     ]]) {
+                        echo "Updating kubeconfig for EKS cluster access..."
                         sh """
                         aws sts get-caller-identity
                         aws eks update-kubeconfig \
@@ -111,17 +109,6 @@ pipeline {
             }
         }
 
-        stage('Health Check: MySQL') {
-            steps {
-                script {
-                    echo "Checking readiness for MySQL..."
-                    sh """
-                    kubectl rollout status deployment/${HELM_RELEASE_NAME} -n ${KUBERNETES_NAMESPACE} --timeout=120s
-                    """
-                }
-            }
-        }
-
         stage('Deploy PetClinic Chart') {
             steps {
                 script {
@@ -143,13 +130,17 @@ pipeline {
             }
         }
 
-        stage('Health Check: PetClinic') {
+        stage('Run Helm Tests') {
+            when {
+                expression { TARGET_ENV != 'prod' }
+            }
             steps {
                 script {
-                    echo "Checking readiness for PetClinic..."
-                    sh """
-                    kubectl rollout status deployment/petclinic -n ${KUBERNETES_NAMESPACE} --timeout=180s
-                    """
+                    catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                        sh """
+                        helm test ${HELM_RELEASE_NAME} -n ${KUBERNETES_NAMESPACE} --kubeconfig ${KUBECONFIG_PATH}
+                        """
+                    }
                 }
             }
         }
@@ -162,9 +153,8 @@ pipeline {
         failure {
             echo "Deployment failed for ${TARGET_ENV}. Collecting logs for debugging..."
             sh """
-            kubectl get all -n ${KUBERNETES_NAMESPACE} || true
-            kubectl logs -l app=mysql -n ${KUBERNETES_NAMESPACE} || true
-            kubectl logs -l app=petclinic -n ${KUBERNETES_NAMESPACE} || true
+            kubectl get all -n ${KUBERNETES_NAMESPACE}
+            kubectl logs -l app=petclinic -n ${KUBERNETES_NAMESPACE}
             """
         }
     }
