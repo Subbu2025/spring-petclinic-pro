@@ -4,10 +4,9 @@ pipeline {
     agent any
 
     environment {
-        HELM_RELEASE_NAME = 'petclinic-mysql' // Default value for the Helm release name
         KUBERNETES_NAMESPACE = '' 
-        TARGET_ENV = ''          
-        HELM_RELEASE_NAME = ''   
+        TARGET_ENV = '' 
+        HELM_RELEASE_NAME = 'petclinic-mysql' // Default value for the Helm release name
         HELM_CHART_REPO_URL = 'https://github.com/Subbu2025/PetClinic-Helm-Charts.git'
         HELM_CHART_REPO_BRANCH = 'main'
         KUBECONFIG_PATH = '/var/lib/jenkins/.kube/config'
