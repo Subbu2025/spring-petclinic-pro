@@ -166,7 +166,7 @@ pipeline {
             steps {
                 script {
                     buildAndPushDocker(
-                        repoUrl: '905418425077.dkr.ecr.ap-south-1.amazonaws.com',
+                        repoUrl: '905418425077.dkr.ecr.ap-south-1.amazonaws.com/dev-qa/petclinic',
                         awsCredentialsId: "aws-eks-credentials",
                         dockerImageName: "spring-petclinic",
                         prId: env.CHANGE_ID, // Use PR ID from environment if available
