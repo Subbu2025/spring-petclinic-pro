@@ -162,19 +162,7 @@ pipeline {
             }
         }
 
-        stage('SonarQube Analysis') {
-            steps {
-                script {
-                    sonarQubeAnalysis(
-                        namespace: KUBERNETES_NAMESPACE,
-                        awsCredentialsId: "aws-eks-credentials",
-                        debug: true
-                    )
-                }
-            }
-        }
-
-        stage('Build Docker Image') {
+        stage('Build and Push Docker Image') {
             steps {
                 script {
                     dockerBuildAndPushScript(
@@ -185,7 +173,6 @@ pipeline {
                 }
             }
         }
-
 
         stage('Deploy MySQL Chart') {
             steps {
@@ -230,6 +217,19 @@ pipeline {
                 }
             }
         }
+
+        stage('SonarQube Analysis') {
+            steps {
+                script {
+                    sonarQubeAnalysis(
+                        namespace: KUBERNETES_NAMESPACE,
+                        awsCredentialsId: "aws-eks-credentials",
+                        debug: true
+                    )
+                }
+            }
+        }
+
 
         stage('Run Helm Tests') {
             when {
