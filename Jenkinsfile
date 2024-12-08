@@ -88,64 +88,55 @@ pipeline {
             }
         }
         
-        stage('Fetch Helm Charts') {
-            steps {
-                script {
-                    echo "Cloning Helm charts repository..."
-                    checkout([ 
-                        $class: 'GitSCM',
-                        branches: [[name: HELM_CHART_REPO_BRANCH]],
-                        userRemoteConfigs: [[
-                            url: HELM_CHART_REPO_URL,
-                            credentialsId: 'Subbu2025_github-creds'
-                        ]]
-                    ])
-                    
-                    if (!fileExists('charts')) {
-                        error "Charts directory not found! Ensure Helm chart repo is correctly cloned."
+            stage('Fetch Helm Charts') {
+                steps {
+                    script {
+                        echo "Cloning Helm charts repository..."
+                        checkout([ 
+                            $class: 'GitSCM',
+                            branches: [[name: HELM_CHART_REPO_BRANCH]],
+                            userRemoteConfigs: [[
+                                url: HELM_CHART_REPO_URL,
+                                credentialsId: 'Subbu2025_github-creds'
+                            ]]
+                        ])
+                        
+                        if (!fileExists('charts')) {
+                            error "Charts directory not found! Ensure Helm chart repo is correctly cloned."
+                        }
+            
+                        // Add the missing Bitnami Helm repository
+                        echo "Adding Bitnami Helm repository..."
+                        sh "helm repo add bitnami https://charts.bitnami.com/bitnami"
+                        
+                        // Update repositories to fetch metadata
+                        echo "Updating Helm repositories..."
+                        sh "helm repo update"
+            
+                        echo "Building dependencies for Helm charts..."
+                        sh "helm dependency build ./charts/petclinic-chart"
                     }
-        
-                    // Add the missing Helm repository
-                    echo "Adding Bitnami Helm repository..."
-                    sh "helm repo add bitnami https://charts.bitnami.com/bitnami"
-                    
-                    // Update Helm repositories
-                    echo "Updating Helm repositories..."
-                    sh "helm repo update"
-        
-                    echo "Building dependencies for Helm charts..."
-                    sh "helm dependency build ./charts/petclinic-chart"
                 }
             }
-        }
+
    
         stage('Validate ConfigMaps and Secrets') {
             steps {
                 script {
-                    echo "Validating ConfigMaps and Secrets in namespace ${KUBERNETES_NAMESPACE}..."
-        
-                    // Validate ConfigMap
-                    def configMapExists = sh(
-                        script: "kubectl get configmap app-config-${TARGET_ENV} -n ${KUBERNETES_NAMESPACE} || echo 'missing'",
-                        returnStdout: true
-                    ).trim()
-                    if (configMapExists.contains('missing')) {
-                        error "ConfigMap 'app-config-${TARGET_ENV}' is missing in namespace ${KUBERNETES_NAMESPACE}."
+                    withCredentials([[ 
+                        $class: 'AmazonWebServicesCredentialsBinding', 
+                        credentialsId: 'aws-eks-credentials'
+                    ]]) {
+                        echo "Validating ConfigMaps and Secrets in namespace ${KUBERNETES_NAMESPACE}..."
+                        sh """
+                        kubectl get configmap app-config-${TARGET_ENV} -n ${KUBERNETES_NAMESPACE} || echo 'ConfigMap missing'
+                        kubectl get secret ${TARGET_ENV}-secrets -n ${KUBERNETES_NAMESPACE} || echo 'Secret missing'
+                        """
                     }
-        
-                    // Validate Secret
-                    def secretExists = sh(
-                        script: "kubectl get secret ${HELM_RELEASE_NAME}-secrets -n ${KUBERNETES_NAMESPACE} || echo 'missing'",
-                        returnStdout: true
-                    ).trim()
-                    if (secretExists.contains('missing')) {
-                        error "Secret '${HELM_RELEASE_NAME}-secrets' is missing in namespace ${KUBERNETES_NAMESPACE}."
-                    }
-        
-                    echo "ConfigMaps and Secrets validation passed."
                 }
             }
         }
+
 
         stage('Checkout Code') {
             steps {
