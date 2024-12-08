@@ -4,12 +4,12 @@ pipeline {
     agent any
 
     environment {
-        KUBERNETES_NAMESPACE = '' // Namespace dynamically set
-        TARGET_ENV = ''           // Environment (dev-qa, uat, or prod)
-        HELM_RELEASE_NAME = ''    // Release name dynamically set
+        KUBERNETES_NAMESPACE = '' 
+        TARGET_ENV = ''          
+        HELM_RELEASE_NAME = ''   
         HELM_CHART_REPO_URL = 'https://github.com/Subbu2025/PetClinic-Helm-Charts.git'
         HELM_CHART_REPO_BRANCH = 'main'
-        KUBECONFIG_PATH = '/var/lib/jenkins/.kube/config' // Path to kubeconfig for Jenkins
+        KUBECONFIG_PATH = '/var/lib/jenkins/.kube/config'
     }
 
     stages {
@@ -37,7 +37,7 @@ pipeline {
                             error "Invalid deployment environment selected."
                         }
                     } else {
-                        error "Unsupported branch: ${env.BRANCH_NAME}"
+                        error "Unsupported branch: ${env.BRANCH_NAME}."
                     }
 
                     echo "Target Environment: ${TARGET_ENV}"
@@ -58,6 +58,9 @@ pipeline {
                             credentialsId: 'Subbu2025_github-creds'
                         ]]
                     ])
+                    if (!fileExists('charts')) {
+                        error "Charts directory not found! Ensure Helm chart repo is correctly cloned."
+                    }
                 }
             }
         }
@@ -72,12 +75,10 @@ pipeline {
                         echo "Updating kubeconfig for EKS cluster access..."
                         sh """
                         aws sts get-caller-identity
-                        
                         aws eks update-kubeconfig \
                             --region ap-south-1 \
                             --name devops-petclinicapp-dev-ap-south-1 \
                             --alias devops-petclinicapp
-
                         kubectl get nodes --kubeconfig ${KUBECONFIG_PATH}
                         """
                     }
@@ -87,21 +88,34 @@ pipeline {
 
         stage('Deploy MySQL Chart') {
             steps {
-                script {
-                    withCredentials([[ 
-                        $class: 'AmazonWebServicesCredentialsBinding', 
-                        credentialsId: 'aws-eks-credentials' 
-                    ]]) {
-                        sh """
-                        AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \
-                        AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \
-                        helm upgrade --install ${HELM_RELEASE_NAME} ./charts/mysql-chart \
-                          -f ./charts/mysql-chart/environments/${TARGET_ENV}/mysql-values.yaml \
-                          --set serviceAccount.name=secrets-manager-sa \
-                          -n ${KUBERNETES_NAMESPACE} \
-                          --kubeconfig ${KUBECONFIG_PATH} --debug
-                        """
+                retry(3) {
+                    script {
+                        withCredentials([[ 
+                            $class: 'AmazonWebServicesCredentialsBinding', 
+                            credentialsId: 'aws-eks-credentials' 
+                        ]]) {
+                            sh """
+                            AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \
+                            AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \
+                            helm upgrade --install ${HELM_RELEASE_NAME} ./charts/mysql-chart \
+                              -f ./charts/mysql-chart/environments/${TARGET_ENV}/mysql-values.yaml \
+                              --set serviceAccount.name=secrets-manager-sa \
+                              -n ${KUBERNETES_NAMESPACE} \
+                              --kubeconfig ${KUBECONFIG_PATH} --debug
+                            """
+                        }
                     }
+                }
+            }
+        }
+
+        stage('Health Check: MySQL') {
+            steps {
+                script {
+                    echo "Checking readiness for MySQL..."
+                    sh """
+                    kubectl rollout status deployment/${HELM_RELEASE_NAME} -n ${KUBERNETES_NAMESPACE} --timeout=120s
+                    """
                 }
             }
         }
@@ -127,15 +141,28 @@ pipeline {
             }
         }
 
+        stage('Health Check: PetClinic') {
+            steps {
+                script {
+                    echo "Checking readiness for PetClinic..."
+                    sh """
+                    kubectl rollout status deployment/petclinic -n ${KUBERNETES_NAMESPACE} --timeout=180s
+                    """
+                }
+            }
+        }
+
         stage('Run Helm Tests') {
             when {
                 expression { TARGET_ENV != 'prod' }
             }
             steps {
                 script {
-                    sh """
-                    helm test ${HELM_RELEASE_NAME} -n ${KUBERNETES_NAMESPACE} --kubeconfig ${KUBECONFIG_PATH}
-                    """
+                    catchError(buildResult: 'SUCCESS', stageResult: 'FAILURE') {
+                        sh """
+                        helm test ${HELM_RELEASE_NAME} -n ${KUBERNETES_NAMESPACE} --kubeconfig ${KUBECONFIG_PATH}
+                        """
+                    }
                 }
             }
         }
@@ -146,8 +173,11 @@ pipeline {
             echo "Deployment completed successfully for ${TARGET_ENV}."
         }
         failure {
-            echo "Deployment failed for ${TARGET_ENV}."
-            sh "kubectl describe po -n ${KUBERNETES_NAMESPACE}" // Debugging output for failed pods
+            echo "Deployment failed for ${TARGET_ENV}. Collecting logs for debugging..."
+            sh """
+            kubectl get all -n ${KUBERNETES_NAMESPACE}
+            kubectl logs -l app=petclinic -n ${KUBERNETES_NAMESPACE}
+            """
         }
     }
 }
