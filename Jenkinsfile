@@ -96,7 +96,8 @@ pipeline {
                 script {
                     sonarQubeAnalysis(
                         namespace: KUBERNETES_NAMESPACE,
-                        awsCredentialsId: "aws-eks-credentials"
+                        awsCredentialsId: "aws-eks-credentials",
+                        debug: true
                     )
                 }
             }
