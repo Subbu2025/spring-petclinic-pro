@@ -110,9 +110,12 @@ pipeline {
                             ]]
                         ])
             
+                        echo "Listing workspace structure after cloning Helm charts:"
+                        sh "ls -Rla"
+            
                         echo "Validating Helm chart structure..."
-                        if (!fileExists('charts/mysql-chart') || !fileExists('charts/petclinic-chart')) {
-                            error "Required Helm charts not found in the repository. Check the repository structure."
+                        if (!fileExists('charts/mysql-chart')) {
+                            error "MySQL chart directory not found under 'charts/'. Check repository structure."
                         }
             
                         echo "Adding Bitnami Helm repository..."
@@ -122,12 +125,11 @@ pipeline {
                         sh "helm repo update"
             
                         echo "Building dependencies for Helm charts..."
-                        sh "helm dependency build charts/petclinic-chart"
+                        sh "helm dependency build charts/mysql-chart"
                     }
                 }
             }
-
-
+            
 
    
         stage('Validate ConfigMaps and Secrets') {
@@ -278,5 +280,9 @@ pipeline {
             kubectl logs -l app=petclinic -n ${KUBERNETES_NAMESPACE}
             """
         }
+        always {
+        echo "Cleaning up workspace to avoid conflicts in subsequent runs..."
+        deleteDir()
+    }
     }
 }
