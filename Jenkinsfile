@@ -74,23 +74,30 @@ pipeline {
         stage('Setup Kubernetes Access') {
             steps {
                 script {
-                    withCredentials([[ 
-                        $class: 'AmazonWebServicesCredentialsBinding', 
-                        credentialsId: 'aws-eks-credentials' 
+                    withCredentials([[
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'aws-eks-credentials'
                     ]]) {
                         echo "Updating kubeconfig for EKS cluster access..."
-                        sh """
-                        aws sts get-caller-identity
-                        aws eks update-kubeconfig \
-                            --region ap-south-1 \
-                            --name devops-petclinicapp-dev-ap-south-1 \
-                            --alias devops-petclinicapp
-                        kubectl get nodes --kubeconfig ${KUBECONFIG_PATH}
-                        """
+                        try {
+                            sh """
+                            aws sts get-caller-identity
+                            aws eks update-kubeconfig \
+                                --region ap-south-1 \
+                                --name devops-petclinicapp-dev-ap-south-1 \
+                                --alias devops-petclinicapp
+                            echo "Kubeconfig Path: ${KUBECONFIG_PATH}"
+                            cat ${KUBECONFIG_PATH}
+                            kubectl get nodes --kubeconfig ${KUBECONFIG_PATH}
+                            """
+                        } catch (Exception e) {
+                            error "Failed to set up Kubernetes access. Check AWS credentials, EKS cluster, or kubeconfig path."
+                        }
                     }
                 }
             }
         }
+
 
         stage('Fetch Helm Charts') {
             steps {
