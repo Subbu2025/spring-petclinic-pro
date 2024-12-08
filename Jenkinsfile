@@ -88,7 +88,7 @@ pipeline {
             }
         }
         
-         stage('Fetch Helm Charts') {
+        stage('Fetch Helm Charts') {
             steps {
                 script {
                     echo "Cloning Helm charts repository..."
@@ -100,17 +100,25 @@ pipeline {
                             credentialsId: 'Subbu2025_github-creds'
                         ]]
                     ])
+                    
                     if (!fileExists('charts')) {
                         error "Charts directory not found! Ensure Helm chart repo is correctly cloned."
                     }
+        
+                    // Add the missing Helm repository
+                    echo "Adding Bitnami Helm repository..."
+                    sh "helm repo add bitnami https://charts.bitnami.com/bitnami"
+                    
+                    // Update Helm repositories
+                    echo "Updating Helm repositories..."
+                    sh "helm repo update"
+        
                     echo "Building dependencies for Helm charts..."
                     sh "helm dependency build ./charts/petclinic-chart"
                 }
             }
         }
-
-        
-        
+   
         stage('Validate ConfigMaps and Secrets') {
             steps {
                 script {
