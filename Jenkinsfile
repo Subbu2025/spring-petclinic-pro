@@ -72,19 +72,22 @@ pipeline {
                         $class: 'AmazonWebServicesCredentialsBinding', 
                         credentialsId: 'aws-eks-credentials' 
                     ]]) {
-                        echo "Updating kubeconfig for EKS cluster access..."
+                        echo "Testing AWS and Kubernetes access..."
                         sh """
                         aws sts get-caller-identity
+                        
                         aws eks update-kubeconfig \
                             --region ap-south-1 \
                             --name devops-petclinicapp-dev-ap-south-1 \
                             --alias devops-petclinicapp
+                        
                         kubectl get nodes --kubeconfig ${KUBECONFIG_PATH}
                         """
                     }
                 }
             }
         }
+
 
         stage('Deploy MySQL Chart') {
             steps {
@@ -172,12 +175,14 @@ pipeline {
         success {
             echo "Deployment completed successfully for ${TARGET_ENV}."
         }
-        failure {
+            failure {
             echo "Deployment failed for ${TARGET_ENV}. Collecting logs for debugging..."
             sh """
-            kubectl get all -n ${KUBERNETES_NAMESPACE}
-            kubectl logs -l app=petclinic -n ${KUBERNETES_NAMESPACE}
+            kubectl get all -n ${KUBERNETES_NAMESPACE} || true
+            kubectl logs -l app=mysql -n ${KUBERNETES_NAMESPACE} || true
+            kubectl logs -l app=petclinic -n ${KUBERNETES_NAMESPACE} || true
             """
-        }
+            }
+
     }
 }
