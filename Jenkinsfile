@@ -67,6 +67,34 @@ pipeline {
             }
         }
 
+        stage('Validate ConfigMaps and Secrets') {
+            steps {
+                script {
+                    echo "Validating ConfigMaps and Secrets in namespace ${KUBERNETES_NAMESPACE}..."
+        
+                    // Validate ConfigMap
+                    def configMapExists = sh(
+                        script: "kubectl get configmap app-config-${TARGET_ENV} -n ${KUBERNETES_NAMESPACE} || echo 'missing'",
+                        returnStdout: true
+                    ).trim()
+                    if (configMapExists.contains('missing')) {
+                        error "ConfigMap 'app-config-${TARGET_ENV}' is missing in namespace ${KUBERNETES_NAMESPACE}."
+                    }
+        
+                    // Validate Secret
+                    def secretExists = sh(
+                        script: "kubectl get secret ${HELM_RELEASE_NAME}-secrets -n ${KUBERNETES_NAMESPACE} || echo 'missing'",
+                        returnStdout: true
+                    ).trim()
+                    if (secretExists.contains('missing')) {
+                        error "Secret '${HELM_RELEASE_NAME}-secrets' is missing in namespace ${KUBERNETES_NAMESPACE}."
+                    }
+        
+                    echo "ConfigMaps and Secrets validation passed."
+                }
+            }
+        }
+
         stage('Checkout Code') {
             steps {
                 script {
