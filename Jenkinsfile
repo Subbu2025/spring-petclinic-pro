@@ -165,7 +165,7 @@ pipeline {
         stage('Build and Push Docker Image') {
             steps {
                 script {
-                    dockerBuildAndPushScript(
+                    buildAndPushDocker(
                         imageName: "spring-petclinic",
                         awsCredentialsId: "aws-eks-credentials",
                         ecrUrl: '905418425077.dkr.ecr.ap-south-1.amazonaws.com'
