@@ -13,7 +13,7 @@ pipeline {
     }
 
     stages {
-        stage('Setup Environment') {
+         stage('Setup Environment') {
             steps {
                 script {
                     if (env.BRANCH_NAME == 'develop') {
@@ -67,6 +67,48 @@ pipeline {
             }
         }
 
+         stage('Fetch Helm Charts') {
+            steps {
+                script {
+                    echo "Cloning Helm charts repository..."
+                    checkout([ 
+                        $class: 'GitSCM',
+                        branches: [[name: HELM_CHART_REPO_BRANCH]],
+                        userRemoteConfigs: [[
+                            url: HELM_CHART_REPO_URL,
+                            credentialsId: 'Subbu2025_github-creds'
+                        ]]
+                    ])
+                    if (!fileExists('charts')) {
+                        error "Charts directory not found! Ensure Helm chart repo is correctly cloned."
+                    }
+                    echo "Building dependencies for Helm charts..."
+                    sh "helm dependency build ./charts/petclinic-chart"
+                }
+            }
+        }
+
+        stage('Setup Kubernetes Access') {
+            steps {
+                script {
+                    withCredentials([[ 
+                        $class: 'AmazonWebServicesCredentialsBinding', 
+                        credentialsId: 'aws-eks-credentials' 
+                    ]]) {
+                        echo "Updating kubeconfig for EKS cluster access..."
+                        sh """
+                        aws sts get-caller-identity
+                        aws eks update-kubeconfig \
+                            --region ap-south-1 \
+                            --name devops-petclinicapp-dev-ap-south-1 \
+                            --alias devops-petclinicapp
+                        kubectl get nodes --kubeconfig ${KUBECONFIG_PATH}
+                        """
+                    }
+                }
+            }
+        }
+        
         stage('Validate ConfigMaps and Secrets') {
             steps {
                 script {
@@ -143,47 +185,6 @@ pipeline {
             }
         }
 
-        stage('Fetch Helm Charts') {
-            steps {
-                script {
-                    echo "Cloning Helm charts repository..."
-                    checkout([ 
-                        $class: 'GitSCM',
-                        branches: [[name: HELM_CHART_REPO_BRANCH]],
-                        userRemoteConfigs: [[
-                            url: HELM_CHART_REPO_URL,
-                            credentialsId: 'Subbu2025_github-creds'
-                        ]]
-                    ])
-                    if (!fileExists('charts')) {
-                        error "Charts directory not found! Ensure Helm chart repo is correctly cloned."
-                    }
-                    echo "Building dependencies for Helm charts..."
-                    sh "helm dependency build ./charts/petclinic-chart"
-                }
-            }
-        }
-
-        stage('Setup Kubernetes Access') {
-            steps {
-                script {
-                    withCredentials([[ 
-                        $class: 'AmazonWebServicesCredentialsBinding', 
-                        credentialsId: 'aws-eks-credentials' 
-                    ]]) {
-                        echo "Updating kubeconfig for EKS cluster access..."
-                        sh """
-                        aws sts get-caller-identity
-                        aws eks update-kubeconfig \
-                            --region ap-south-1 \
-                            --name devops-petclinicapp-dev-ap-south-1 \
-                            --alias devops-petclinicapp
-                        kubectl get nodes --kubeconfig ${KUBECONFIG_PATH}
-                        """
-                    }
-                }
-            }
-        }
 
         stage('Deploy MySQL Chart') {
             steps {
