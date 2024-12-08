@@ -129,6 +129,40 @@ pipeline {
             }
         }
 
+         stage('Apply ConfigMaps and Secrets') {
+            steps {
+                script {
+                    echo "Checking and applying ConfigMaps and Secrets..."
+                    
+                    // Check if ConfigMap exists; apply if not found
+                    def configMapExists = sh(
+                        script: "kubectl get configmap ${CONFIGMAP_NAME} -n ${KUBERNETES_NAMESPACE} || echo 'not_found'",
+                        returnStdout: true
+                    ).trim()
+                    
+                    if (configMapExists.contains('not_found')) {
+                        echo "ConfigMap not found. Applying ConfigMap..."
+                        sh "kubectl apply -f helm_charts/charts/petclinic-chart/templates/configmap.yaml"
+                    } else {
+                        echo "ConfigMap already exists."
+                    }
+                    
+                    // Check if Secret exists; apply if not found
+                    def secretExists = sh(
+                        script: "kubectl get secret ${SECRET_NAME} -n ${KUBERNETES_NAMESPACE} || echo 'not_found'",
+                        returnStdout: true
+                    ).trim()
+                    
+                    if (secretExists.contains('not_found')) {
+                        echo "Secret not found. Applying ExternalSecret..."
+                        sh "kubectl apply -f helm_charts/charts/petclinic-chart/templates/externalsecret.yaml"
+                    } else {
+                        echo "Secret already exists."
+                    }
+                }
+            }
+        }
+
         stage('Validate ConfigMaps and Secrets') {
             steps {
                 script {
