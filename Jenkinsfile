@@ -4,9 +4,9 @@ pipeline {
     agent any
 
     environment {
-        KUBERNETES_NAMESPACE = '' 
-        TARGET_ENV = ''          
-        HELM_RELEASE_NAME = ''   
+        KUBERNETES_NAMESPACE = ''
+        TARGET_ENV = ''
+        HELM_RELEASE_NAME = ''
         HELM_CHART_REPO_URL = 'https://github.com/Subbu2025/PetClinic-Helm-Charts.git'
         HELM_CHART_REPO_BRANCH = 'main'
         KUBECONFIG_PATH = '/var/lib/jenkins/.kube/config'
@@ -61,6 +61,11 @@ pipeline {
                     if (!fileExists('charts')) {
                         error "Charts directory not found! Ensure Helm chart repo is correctly cloned."
                     }
+                    echo "Building Helm chart dependencies..."
+                    sh """
+                    helm dependency build ./charts/mysql-chart
+                    helm dependency build ./charts/petclinic-chart
+                    """
                 }
             }
         }
@@ -87,7 +92,6 @@ pipeline {
                 }
             }
         }
-
 
         stage('Deploy MySQL Chart') {
             steps {
@@ -116,9 +120,11 @@ pipeline {
             steps {
                 script {
                     echo "Checking readiness for MySQL..."
-                    sh """
-                    kubectl rollout status deployment/${HELM_RELEASE_NAME} -n ${KUBERNETES_NAMESPACE} --timeout=120s
-                    """
+                    catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                        sh """
+                        kubectl rollout status deployment/${HELM_RELEASE_NAME} -n ${KUBERNETES_NAMESPACE} --timeout=120s
+                        """
+                    }
                 }
             }
         }
@@ -148,9 +154,11 @@ pipeline {
             steps {
                 script {
                     echo "Checking readiness for PetClinic..."
-                    sh """
-                    kubectl rollout status deployment/petclinic -n ${KUBERNETES_NAMESPACE} --timeout=180s
-                    """
+                    catchError(buildResult: 'FAILURE', stageResult: 'FAILURE') {
+                        sh """
+                        kubectl rollout status deployment/petclinic -n ${KUBERNETES_NAMESPACE} --timeout=180s
+                        """
+                    }
                 }
             }
         }
@@ -175,14 +183,16 @@ pipeline {
         success {
             echo "Deployment completed successfully for ${TARGET_ENV}."
         }
-            failure {
+        failure {
             echo "Deployment failed for ${TARGET_ENV}. Collecting logs for debugging..."
             sh """
             kubectl get all -n ${KUBERNETES_NAMESPACE} || true
+            kubectl describe deployment mysql-dev-qa -n ${KUBERNETES_NAMESPACE} || true
+            kubectl describe deployment petclinic -n ${KUBERNETES_NAMESPACE} || true
             kubectl logs -l app=mysql -n ${KUBERNETES_NAMESPACE} || true
             kubectl logs -l app=petclinic -n ${KUBERNETES_NAMESPACE} || true
+            kubectl get events -n ${KUBERNETES_NAMESPACE} || true
             """
-            }
-
+        }
     }
 }
