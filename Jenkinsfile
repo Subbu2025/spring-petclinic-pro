@@ -188,32 +188,25 @@ pipeline {
                 }
             }
         }
+
         stage('Deploy MySQL Chart') {
             steps {
-                retry(3) { // Retry the deployment 3 times if it fails
+                retry(3) {
                     script {
-                        withCredentials([[ // Bind AWS credentials
+                        withCredentials([[
                             $class: 'AmazonWebServicesCredentialsBinding',
                             credentialsId: 'aws-eks-credentials'
                         ]]) {
-                            // Add debug steps to verify the workspace and chart path
+                            // Debug: List contents of charts directory
                             sh """
-                            echo "Listing workspace contents:"
-                            ls -la
-                            
-                            echo "Listing contents of ./charts/mysql-chart:"
-                            ls -la ./charts/mysql-chart || echo "MySQL chart directory not found!"
-                            
-                            echo "Listing contents of ./charts/mysql-chart/environments/${TARGET_ENV}:"
-                            ls -la ./charts/mysql-chart/environments/${TARGET_ENV} || echo "Environment values directory not found!"
-                            
-                            echo "Checking if kubeconfig exists and is accessible:"
-                            ls -la ${KUBECONFIG_PATH} || echo "Kubeconfig not found!"
+                            echo "Listing contents of Helm charts directory:"
+                            ls -la ./charts
+                            ls -la ./charts/mysql-chart
+                            ls -la ./charts/mysql-chart/environments/${TARGET_ENV}
                             """
-        
-                            // Execute the Helm upgrade command
+                            
+                            // Helm upgrade command
                             sh """
-                            echo "Running Helm upgrade/install for MySQL chart..."
                             helm upgrade --install ${HELM_RELEASE_NAME} ./charts/mysql-chart \
                               -f ./charts/mysql-chart/environments/${TARGET_ENV}/mysql-values.yaml \
                               --set serviceAccount.name=secrets-manager-sa \
@@ -225,6 +218,7 @@ pipeline {
                 }
             }
         }
+
 
         stage('Deploy PetClinic Chart') {
             steps {
