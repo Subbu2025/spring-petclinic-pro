@@ -95,42 +95,49 @@ pipeline {
         }
         
         stage('Fetch Helm Charts') {
-            steps {
-                script {
-                    echo "Cloning Helm charts repository..."
-                    checkout([ 
-                        $class: 'GitSCM',
-                        branches: [[name: HELM_CHART_REPO_BRANCH]],
-                        userRemoteConfigs: [[
-                            url: HELM_CHART_REPO_URL,
-                            credentialsId: 'Subbu2025_github-creds'
-                        ]],
-                        extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'charts']]
-                    ])
-                    
-                    // Validate that the charts directory exists
-                    if (!fileExists('charts/petclinic-chart')) {
-                        error "PetClinic chart directory not found under 'charts/'. Check if Helm chart repo is correctly cloned and contains the expected structure."
-                    }
-        
-                    // Debugging: List directory contents
-                    echo "Workspace structure after cloning Helm charts:"
-                    sh "ls -la"
-                    sh "ls -la ./charts"
-                    
-                    // Add the missing Bitnami Helm repository
-                    echo "Adding Bitnami Helm repository..."
-                    sh "helm repo add bitnami https://charts.bitnami.com/bitnami"
-                    
-                    // Update repositories to fetch metadata
-                    echo "Updating Helm repositories..."
-                    sh "helm repo update"
-                    
-                    echo "Building dependencies for Helm charts..."
-                    sh "helm dependency build ./charts/petclinic-chart"
+    steps {
+        script {
+            echo "Cleaning up workspace to avoid conflicts..."
+            deleteDir() // Ensure a clean workspace
+
+            echo "Cloning Helm charts repository..."
+            checkout([
+                $class: 'GitSCM',
+                branches: [[name: HELM_CHART_REPO_BRANCH]],
+                userRemoteConfigs: [[
+                    url: HELM_CHART_REPO_URL,
+                    credentialsId: 'Subbu2025_github-creds'
+                ]],
+                extensions: [[$class: 'RelativeTargetDirectory', relativeTargetDir: 'charts']]
+            ])
+
+            echo "Listing workspace structure after cloning Helm charts:"
+            sh "ls -la" // Check the workspace structure
+            echo "Listing contents of cloned Helm charts directory:"
+            sh "ls -la charts"
+
+            // Navigate into the charts directory
+            dir('charts') {
+                echo "Validating Helm chart structure..."
+                if (!fileExists('petclinic-chart')) {
+                    error "PetClinic chart directory not found under 'charts/'. Check if Helm chart repo is correctly cloned and contains the expected structure."
                 }
+
+                // Add Bitnami Helm repository
+                echo "Adding Bitnami Helm repository..."
+                sh "helm repo add bitnami https://charts.bitnami.com/bitnami"
+
+                // Update Helm repositories
+                echo "Updating Helm repositories..."
+                sh "helm repo update"
+
+                echo "Building dependencies for Helm charts..."
+                sh "helm dependency build petclinic-chart"
             }
         }
+    }
+}
+
 
    
         stage('Validate ConfigMaps and Secrets') {
