@@ -4,6 +4,7 @@ pipeline {
     agent any
 
     environment {
+        HELM_RELEASE_NAME = 'petclinic-mysql' // Default value for the Helm release name
         KUBERNETES_NAMESPACE = '' 
         TARGET_ENV = ''          
         HELM_RELEASE_NAME = ''   
@@ -175,19 +176,15 @@ pipeline {
                 }
             }
         }
-
-
         stage('Deploy MySQL Chart') {
             steps {
                 retry(3) {
                     script {
-                        withCredentials([[ 
-                            $class: 'AmazonWebServicesCredentialsBinding', 
-                            credentialsId: 'aws-eks-credentials' 
+                        withCredentials([[
+                            $class: 'AmazonWebServicesCredentialsBinding',
+                            credentialsId: 'aws-eks-credentials'
                         ]]) {
                             sh """
-                            AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID} \
-                            AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY} \
                             helm upgrade --install ${HELM_RELEASE_NAME} ./charts/mysql-chart \
                               -f ./charts/mysql-chart/environments/${TARGET_ENV}/mysql-values.yaml \
                               --set serviceAccount.name=secrets-manager-sa \
