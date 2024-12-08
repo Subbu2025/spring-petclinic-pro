@@ -282,12 +282,13 @@ pipeline {
                         credentialsId: 'aws-eks-credentials' 
                     ]]) {
                         sh """
-                        helm upgrade --install petclinic helm_charts/charts/petclinic-chart \
-                          -f helm_charts/charts/petclinic-chart/environments/${TARGET_ENV}/petclinic-values.yaml \
-                          --set serviceAccount.name=secrets-manager-sa \
-                          -n ${KUBERNETES_NAMESPACE} \
-                          --kubeconfig ${KUBECONFIG_PATH} --debug
-                        """
+                            helm upgrade --install petclinic helm_charts/charts/petclinic-chart \
+                              -f helm_charts/charts/petclinic-chart/environments/${TARGET_ENV}/petclinic-values.yaml \
+                              --set app.image.tag=${BUILD_TAG} \
+                              --set app.image.repository=905418425077.dkr.ecr.ap-south-1.amazonaws.com/dev-qa/petclinic \
+                              -n ${KUBERNETES_NAMESPACE} \
+                              --kubeconfig ${KUBECONFIG_PATH} --debug
+                          """
                     }
                 }
             }
