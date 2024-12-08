@@ -166,13 +166,16 @@ pipeline {
             steps {
                 script {
                     buildAndPushDocker(
-                        imageName: "spring-petclinic",
+                        repoUrl: '905418425077.dkr.ecr.ap-south-1.amazonaws.com',
                         awsCredentialsId: "aws-eks-credentials",
-                        ecrUrl: '905418425077.dkr.ecr.ap-south-1.amazonaws.com'
+                        dockerImageName: "spring-petclinic",
+                        prId: env.CHANGE_ID, // Use PR ID from environment if available
+                        shortCommitSha: env.GIT_COMMIT?.take(7) // Shortened Git SHA
                     )
                 }
             }
         }
+
 
         stage('Deploy MySQL Chart') {
             steps {
